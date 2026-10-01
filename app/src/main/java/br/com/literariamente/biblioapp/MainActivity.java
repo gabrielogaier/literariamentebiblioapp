@@ -46,8 +46,11 @@ public class MainActivity extends Activity {
         root.setOnApplyWindowInsetsListener((v,in)->{v.setPadding(in.getSystemWindowInsetLeft(),in.getSystemWindowInsetTop(),in.getSystemWindowInsetRight(),in.getSystemWindowInsetBottom());return in;});
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
         setContentView(root);root.requestApplyInsets();
-        LinearLayout header=new LinearLayout(this);header.setPadding(dp(18),dp(14),dp(18),dp(8));header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
-        if(!current.equals("home")&&!current.equals("books")&&!current.equals("lend"))button(header,"‹",this::onBackPressed);
+        LinearLayout header=new LinearLayout(this);header.setPadding(dp(14),dp(8),dp(18),dp(6));header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header,new LinearLayout.LayoutParams(-1,dp(current.equals("home")?64:58)));
+        if(!current.equals("home")&&!current.equals("books")&&!current.equals("lend")){
+            TextView back=new TextView(this);back.setText("‹");back.setTextSize(36);back.setTextColor(wineDark);back.setGravity(Gravity.CENTER);back.setPadding(0,0,dp(10),0);
+            header.addView(back,new LinearLayout.LayoutParams(dp(46),-1));back.setOnClickListener(v->onBackPressed());
+        }
         TextView heading=text(header,title,current.equals("home")?30:26);heading.setTextColor(wineDark);heading.setTypeface(Typeface.SERIF,Typeface.BOLD);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         body=new LinearLayout(this);body.setOrientation(1);body.setPadding(dp(20),dp(12),dp(20),dp(24));scroll.addView(body);
