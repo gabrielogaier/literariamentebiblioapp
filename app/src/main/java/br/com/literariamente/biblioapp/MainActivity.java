@@ -173,7 +173,7 @@ public class MainActivity extends Activity {
                 if(!lang.isEmpty())meta+=(meta.isEmpty()?"":" · ")+lang;
                 labels[i]=BookSearch.resultTitle(r)+"\n"+meta;
             }
-            AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Escolha o livro").setItems(labels,(d,index)->loadDetails(results.optJSONObject(index),token)).setNegativeButton("Cancelar",null).create();
+            AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Escolha o livro").setItems(labels,(dialogInterface,index)->loadDetails(results.optJSONObject(index),token)).setNegativeButton("Cancelar",null).create();
             dialog.setOnShowListener(v->{ListView list=dialog.getListView();list.setDivider(new android.graphics.drawable.ColorDrawable(Color.rgb(220,220,220)));list.setDividerHeight(dp(1));});
             dialog.show();
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível consultar. Você pode salvar normalmente com título e autor.");});}});
