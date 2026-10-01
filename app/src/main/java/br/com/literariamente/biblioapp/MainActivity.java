@@ -195,38 +195,44 @@ public class MainActivity extends Activity {
 
         EditText bookFilter=input(body,"Filtrar livros por título, autor ou ID","");
         TextView selectedCount=text(body,"Nenhum livro selecionado",16);
-        ScrollView bookScroll=new ScrollView(this);
-        LinearLayout.LayoutParams bookScrollParams=new LinearLayout.LayoutParams(-1,dp(270));
-        bookScrollParams.setMargins(0,dp(4),0,dp(10));
-        body.addView(bookScroll,bookScrollParams);
-        LinearLayout bookList=new LinearLayout(this);bookList.setOrientation(1);bookScroll.addView(bookList,new ScrollView.LayoutParams(-1,-2));
+        ListView bookList=new ListView(this);
+        bookList.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+        LinearLayout.LayoutParams bookListParams=new LinearLayout.LayoutParams(-1,dp(270));
+        bookListParams.setMargins(0,dp(4),0,dp(10));
+        body.addView(bookList,bookListParams);
         Set<Long> selectedBooks=new LinkedHashSet<>();
         if(preselected>0)selectedBooks.add(preselected);
+        ArrayList<JSONObject> filteredBooks=new ArrayList<>();
+        ArrayList<String> bookLabels=new ArrayList<>();
 
         Runnable renderBooks=()->{
-            bookList.removeAllViews();
             String term=bookFilter.getText().toString().trim().toLowerCase(Locale.ROOT);
-            int shown=0;
+            filteredBooks.clear();bookLabels.clear();
             for(JSONObject b:available){
                 String title=b.optString("title").toLowerCase(Locale.ROOT);
                 String author=b.optString("author").toLowerCase(Locale.ROOT);
                 String id=String.valueOf(b.optLong("id"));
                 if(!term.isEmpty()&&!title.contains(term)&&!author.contains(term)&&!id.contains(term))continue;
-                shown++;
-                CheckBox check=new CheckBox(this);
-                long bookId=b.optLong("id");
-                check.setText(b.optString("title")+" · "+b.optString("author")+" (#"+bookId+")");
-                check.setTextSize(16);check.setMinHeight(dp(52));check.setPadding(0,dp(6),0,dp(6));
-                check.setChecked(selectedBooks.contains(bookId));
-                check.setOnCheckedChangeListener((button,isChecked)->{
-                    if(isChecked)selectedBooks.add(bookId);else selectedBooks.remove(bookId);
-                    selectedCount.setText(selectedBooks.isEmpty()?"Nenhum livro selecionado":selectedBooks.size()+" livro(s) selecionado(s)");
-                });
-                bookList.addView(check,new LinearLayout.LayoutParams(-1,-2));
+                filteredBooks.add(b);
+                bookLabels.add(b.optString("title")+" · "+b.optString("author")+" (#"+b.optLong("id")+")");
             }
-            if(shown==0)text(bookList,"Nenhum livro encontrado.",15);
+            ArrayAdapter<String> adapter=new ArrayAdapter<String>(this,android.R.layout.simple_list_item_multiple_choice,bookLabels){
+                @Override public View getView(int position,View convertView,ViewGroup parent){
+                    View v=super.getView(position,convertView,parent);
+                    v.setMinimumHeight(dp(52));
+                    return v;
+                }
+            };
+            bookList.setAdapter(adapter);
+            for(int i=0;i<filteredBooks.size();i++)bookList.setItemChecked(i,selectedBooks.contains(filteredBooks.get(i).optLong("id")));
             selectedCount.setText(selectedBooks.isEmpty()?"Nenhum livro selecionado":selectedBooks.size()+" livro(s) selecionado(s)");
         };
+        bookList.setOnItemClickListener((parent,view,position,id)->{
+            if(position<0||position>=filteredBooks.size())return;
+            long bookId=filteredBooks.get(position).optLong("id");
+            if(bookList.isItemChecked(position))selectedBooks.add(bookId);else selectedBooks.remove(bookId);
+            selectedCount.setText(selectedBooks.isEmpty()?"Nenhum livro selecionado":selectedBooks.size()+" livro(s) selecionado(s)");
+        });
         bookFilter.addTextChangedListener(watcher(renderBooks));renderBooks.run();
 
         List<JSONObject> ps=db.rows("SELECT * FROM people ORDER BY name COLLATE NOCASE");
