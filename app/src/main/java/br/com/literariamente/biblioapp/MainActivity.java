@@ -20,12 +20,14 @@ public class MainActivity extends Activity {
     private LinearLayout body,root;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final Map<String,EditText> fields=new LinkedHashMap<>();
-    private String page="home",cover="";
+    private RatingBar ratingBar;
+    private String page="home";
     private long selected=0,editing=0;
     private JSONObject initial=new JSONObject();
     private int generation=0;
     private final int green=Color.rgb(35,100,91),ink=Color.rgb(34,48,44),paper=Color.rgb(245,242,235);
-    private static final String[] LABELS={"Título *","Autor *","Subtítulo","Editora","Ano","ISBN","Páginas","Descrição","Idioma"};
+    private static final String[] BOOK_FIELDS={"title","author","year"};
+    private static final String[] LABELS={"Título *","Autor *","Ano de lançamento"};
     @Override public void onCreate(Bundle state){
         super.onCreate(state);db=new Db(this);
         if(state!=null){page=state.getString("page","home");selected=state.getLong("selected");editing=state.getLong("editing");}
@@ -38,7 +40,7 @@ public class MainActivity extends Activity {
     @Override protected void onDestroy(){worker.shutdownNow();super.onDestroy();}
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private void layout(String title,String current){
-        generation++;page=current;fields.clear();
+        generation++;page=current;fields.clear();ratingBar=null;
         root=new LinearLayout(this);root.setOrientation(1);root.setBackgroundColor(paper);
         root.setOnApplyWindowInsetsListener((v,in)->{v.setPadding(in.getSystemWindowInsetLeft(),in.getSystemWindowInsetTop(),in.getSystemWindowInsetRight(),in.getSystemWindowInsetBottom());return in;});
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
@@ -74,42 +76,92 @@ public class MainActivity extends Activity {
         button(body,"Pessoas",this::people);button(body,"Histórico de empréstimos",this::history);
         LinearLayout backup=card(body);text(backup,"Proteja sua biblioteca",19);text(backup,"Salve uma cópia antes de trocar ou formatar o celular.",15);button(backup,"Exportar backup",this::exportBackup);button(backup,"Restaurar backup",this::importBackup);
     }
+    private String stars(int rating){if(rating<=0)return "Sem avaliação";StringBuilder s=new StringBuilder();for(int i=1;i<=5;i++)s.append(i<=rating?"★":"☆");return s.toString();}
     private void books(){
-        layout("Meus livros","books");button(body,"Cadastrar livro",()->edit(0,null));EditText q=input(body,"Pesquisar por título, autor ou ISBN","");LinearLayout list=new LinearLayout(this);list.setOrientation(1);body.addView(list);
-        Runnable render=()->{list.removeAllViews();String term="%"+q.getText().toString()+"%";
-            List<JSONObject> data=db.rows("SELECT b.*,p.name AS holder FROM books b LEFT JOIN loans l ON l.book_id=b.id AND l.returned_at IS NULL LEFT JOIN people p ON p.id=l.person_id WHERE b.title LIKE ? OR b.author LIKE ? OR b.isbn LIKE ? ORDER BY b.title COLLATE NOCASE",term,term,term);
-            if(data.isEmpty())text(list,"Nenhum livro encontrado. Você pode cadastrar apenas com título e autor.",16);
-            for(JSONObject b:data){LinearLayout c=card(list);text(c,b.optString("title"),20);text(c,b.optString("author"),16);text(c,b.isNull("holder")?"Disponível":"Com "+b.optString("holder"),15);button(c,"Abrir",()->book(b.optLong("id")));}
-        };q.addTextChangedListener(watcher(render));render.run();
+        layout("Meus livros","books");button(body,"Cadastrar livro",()->edit(0,null));
+        EditText q=input(body,"Pesquisar por título ou autor","");
+        text(body,"Filtrar avaliação",14);
+        Spinner ratingFilter=new Spinner(this);
+        String[] filters={"Todos","Melhores avaliados","5 estrelas","4 estrelas ou mais","Não avaliados"};
+        ratingFilter.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,filters));
+        body.addView(ratingFilter,new LinearLayout.LayoutParams(-1,dp(58)));
+        LinearLayout list=new LinearLayout(this);list.setOrientation(1);body.addView(list);
+        Runnable render=()->{
+            list.removeAllViews();String term=q.getText().toString().trim().toLowerCase(Locale.ROOT);
+            List<JSONObject> data=db.rows("SELECT b.*,p.name AS holder FROM books b LEFT JOIN loans l ON l.book_id=b.id AND l.returned_at IS NULL LEFT JOIN people p ON p.id=l.person_id ORDER BY b.title COLLATE NOCASE");
+            ArrayList<JSONObject> shown=new ArrayList<>();
+            int mode=ratingFilter.getSelectedItemPosition();
+            for(JSONObject b:data){
+                String title=b.optString("title").toLowerCase(Locale.ROOT),author=b.optString("author").toLowerCase(Locale.ROOT);
+                if(!term.isEmpty()&&!title.contains(term)&&!author.contains(term))continue;
+                int rating=b.optInt("rating",0);
+                if(mode==2&&rating!=5)continue;
+                if(mode==3&&rating<4)continue;
+                if(mode==4&&rating!=0)continue;
+                shown.add(b);
+            }
+            if(mode==1)Collections.sort(shown,(a,b)->Integer.compare(b.optInt("rating",0),a.optInt("rating",0)));
+            if(shown.isEmpty()){text(list,"Nenhum livro encontrado.",16);return;}
+            for(JSONObject b:shown){
+                LinearLayout c=card(list);text(c,b.optString("title"),20);text(c,b.optString("author"),16);
+                String year=b.optString("year");if(!year.isEmpty())text(c,year,14);
+                text(c,stars(b.optInt("rating",0)),18);
+                text(c,b.isNull("holder")?"Disponível":"Com "+b.optString("holder"),15);
+                button(c,"Abrir",()->book(b.optLong("id")));
+            }
+        };
+        q.addTextChangedListener(watcher(render));
+        ratingFilter.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int position,long id){render.run();}});
+        render.run();
     }
     private TextWatcher watcher(Runnable action){return new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){action.run();}public void afterTextChanged(Editable e){}};}
     private void cover(LinearLayout parent,String encoded){if(encoded.isEmpty())return;try{byte[] bytes=Base64.decode(encoded,Base64.DEFAULT);BitmapFactory.Options opt=new BitmapFactory.Options();opt.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,opt);opt.inSampleSize=Math.max(1,Math.max(opt.outWidth,opt.outHeight)/600);opt.inJustDecodeBounds=false;Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,opt);if(bitmap!=null){ImageView image=new ImageView(this);image.setImageBitmap(bitmap);image.setContentDescription("Capa do livro");image.setAdjustViewBounds(true);image.setScaleType(ImageView.ScaleType.FIT_CENTER);parent.addView(image,new LinearLayout.LayoutParams(-1,dp(200)));}}catch(Exception ignored){}}
     private void book(long id){
         List<JSONObject> found=db.rows("SELECT * FROM books WHERE id=?",""+id);if(found.isEmpty()){books();return;}JSONObject b=found.get(0);selected=id;
-        layout("Detalhes do livro","book");cover(body,b.optString("cover"));text(body,b.optString("title"),25);text(body,b.optString("author"),19);
+        layout("Detalhes do livro","book");text(body,b.optString("title"),25);text(body,b.optString("author"),19);
+        if(!b.optString("year").isEmpty())text(body,"Ano: "+b.optString("year"),16);
+        text(body,stars(b.optInt("rating",0)),22);
         List<JSONObject> active=db.rows("SELECT l.id,p.name FROM loans l JOIN people p ON p.id=l.person_id WHERE l.book_id=? AND l.returned_at IS NULL",""+id);
         if(active.isEmpty()){text(body,"Disponível",18);button(body,"Emprestar este livro",()->lend(id));}
         else{JSONObject l=active.get(0);text(body,"Com "+l.optString("name"),19);button(body,"Devolver",()->confirm("Registrar devolução?",b.optString("title"),()->safe(()->{db.giveBack(l.optLong("id"));book(id);toast("Devolução registrada.");})));}
-        button(body,"Editar livro",()->edit(id,null));
-        for(int i=2;i<9;i++){String value=b.optString(Db.BOOK_FIELDS[i]);if(!value.isEmpty())text(body,LABELS[i]+": "+value,16);}
+        button(body,"Editar livro e avaliação",()->edit(id,null));
         text(body,"Histórico deste livro",21);showHistory(body,db.rows("SELECT l.*,b.title,p.name FROM loans l JOIN books b ON b.id=l.book_id JOIN people p ON p.id=l.person_id WHERE b.id=? ORDER BY l.borrowed_at DESC",""+id));
     }
-    private JSONObject draft(){JSONObject o=new JSONObject();for(String f:Db.BOOK_FIELDS)try{o.put(f,f.equals("cover")?cover:fields.containsKey(f)?fields.get(f).getText().toString().trim():"");}catch(Exception ignored){}return o;}
+    private JSONObject draft(){
+        JSONObject o=new JSONObject();
+        try{
+            for(String f:BOOK_FIELDS)o.put(f,fields.containsKey(f)?fields.get(f).getText().toString().trim():"");
+            o.put("rating",ratingBar==null?0:Math.round(ratingBar.getRating()));
+        }catch(Exception ignored){}
+        return o;
+    }
     private void edit(long id,JSONObject provided){
         JSONObject b=provided;if(b==null&&id>0){List<JSONObject> found=db.rows("SELECT * FROM books WHERE id=?",""+id);if(!found.isEmpty())b=found.get(0);}if(b==null)b=new JSONObject();
-        editing=id;layout(id==0?"Cadastrar livro":"Editar livro","edit");cover=b.optString("cover","");cover(body,cover);text(body,"Somente título e autor são necessários.",16);
-        for(int i=0;i<9;i++){EditText e=input(body,LABELS[i],b.optString(Db.BOOK_FIELDS[i],""));fields.put(Db.BOOK_FIELDS[i],e);if(i==7){e.setSingleLine(false);e.setMinLines(3);}if(i==4||i==6)e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);}
-        initial=b.optJSONObject("_initial")==null?draft():b.optJSONObject("_initial");button(body,"Buscar informações online",this::search);button(body,"Salvar livro",()->{
+        editing=id;layout(id==0?"Cadastrar livro":"Editar livro","edit");
+        text(body,"Título e autor são obrigatórios. A avaliação é sua e pode ser alterada depois.",16);
+        for(int i=0;i<BOOK_FIELDS.length;i++){
+            EditText e=input(body,LABELS[i],b.optString(BOOK_FIELDS[i],""));fields.put(BOOK_FIELDS[i],e);
+            if(BOOK_FIELDS[i].equals("year"))e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        }
+        text(body,"Sua avaliação",14);
+        ratingBar=new RatingBar(this,null,android.R.attr.ratingBarStyle);
+        ratingBar.setNumStars(5);ratingBar.setStepSize(1f);ratingBar.setRating(b.optInt("rating",0));ratingBar.setIsIndicator(false);
+        body.addView(ratingBar,new LinearLayout.LayoutParams(-2,-2));
+        button(body,"Limpar avaliação",()->ratingBar.setRating(0));
+        initial=b.optJSONObject("_initial")==null?draft():b.optJSONObject("_initial");
+        button(body,"Buscar informações online",this::search);
+        button(body,"Salvar livro",()->{
             if(fields.get("title").getText().toString().trim().isEmpty()){fields.get("title").setError("Informe o título");return;}
             if(fields.get("author").getText().toString().trim().isEmpty()){fields.get("author").setError("Informe o autor");return;}
             safe(()->{long saved=db.saveBook(id,draft());book(saved);toast("Livro salvo.");});
-        });button(body,"Cancelar",()->leave(()->{if(id>0)book(id);else books();}));
+        });
+        button(body,"Cancelar",()->leave(()->{if(id>0)book(id);else books();}));
     }
     private void search(){
-        JSONObject d=draft();String t=d.optString("title"),a=d.optString("author"),isbn=d.optString("isbn");
-        if(t.isEmpty()&&a.isEmpty()&&isbn.isEmpty()){toast("Informe título, autor ou ISBN para pesquisar.");return;}
+        JSONObject d=draft();String t=d.optString("title"),a=d.optString("author");
+        if(t.isEmpty()&&a.isEmpty()){toast("Informe título ou autor para pesquisar.");return;}
         int token=generation;ProgressDialog progress=ProgressDialog.show(this,"Consultando Open Library","Você poderá salvar manualmente mesmo sem resultado.",true,true);
-        worker.execute(()->{try{JSONArray results=BookSearch.search(t,a,isbn);runOnUiThread(()->{
+        worker.execute(()->{try{JSONArray results=BookSearch.search(t,a);runOnUiThread(()->{
             if(isFinishing()||isDestroyed())return;boolean canceled=!progress.isShowing();progress.dismiss();if(canceled||generation!=token)return;
             if(results.length()==0){toast("Nenhum resultado. Continue o cadastro manual.");return;}
             String[] labels=new String[results.length()];
@@ -127,12 +179,12 @@ public class MainActivity extends Activity {
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível consultar. Você pode salvar normalmente com título e autor.");});}});
     }
     private void loadDetails(JSONObject result,int token){
-        ProgressDialog progress=ProgressDialog.show(this,"Carregando informações","Buscando uma edição e a capa...",true,true);
+        ProgressDialog progress=ProgressDialog.show(this,"Carregando informações","Buscando título, autor e ano...",true,true);
         worker.execute(()->{try{JSONObject info=BookSearch.details(result);runOnUiThread(()->{
             if(isFinishing()||isDestroyed())return;boolean canceled=!progress.isShowing();progress.dismiss();if(canceled||generation!=token)return;
-            confirm("Usar estas informações?","Os campos encontrados substituirão os campos correspondentes no formulário. Revise os dados da edição antes de salvar.",()->{
-                for(String f:fields.keySet())if(!info.optString(f).isEmpty())fields.get(f).setText(info.optString(f));
-                if(!info.optString("cover").isEmpty())cover=info.optString("cover");toast("Informações preenchidas. Revise e toque em Salvar.");
+            confirm("Usar estas informações?","Título, autor e ano encontrados serão preenchidos. Sua avaliação não será alterada.",()->{
+                for(String f:BOOK_FIELDS)if(!info.optString(f).isEmpty())fields.get(f).setText(info.optString(f));
+                toast("Informações preenchidas. Revise e toque em Salvar.");
             });
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível carregar os detalhes. Continue manualmente.");});}});
     }
