@@ -129,13 +129,44 @@ public class MainActivity extends Activity {
     private void lend(long preselected){
         selected=preselected;layout("Emprestar","lend");List<JSONObject> available=db.rows("SELECT b.id,b.title,b.author FROM books b WHERE NOT EXISTS(SELECT 1 FROM loans l WHERE l.book_id=b.id AND l.returned_at IS NULL) ORDER BY b.title COLLATE NOCASE");
         if(available.isEmpty()){text(body,"Não há livros disponíveis para emprestar.",18);button(body,"Cadastrar livro",()->edit(0,null));return;}
-        text(body,"Livro disponível",16);Spinner bs=new Spinner(this);String[] titles=new String[available.size()];int select=0;for(int i=0;i<titles.length;i++){titles[i]=available.get(i).optString("title")+" · "+available.get(i).optString("author")+" (#"+available.get(i).optLong("id")+")";if(available.get(i).optLong("id")==preselected)select=i;}
-        bs.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,titles));body.addView(bs,new LinearLayout.LayoutParams(-1,dp(64)));bs.setSelection(select);
+
+        EditText bookFilter=input(body,"Filtrar livro por título, autor ou ID","");
+        text(body,"Livro disponível",16);
+        Spinner bs=new Spinner(this);
+        ArrayList<JSONObject> filtered=new ArrayList<>(available);
+        ArrayList<String> bookLabels=new ArrayList<>();
+        for(JSONObject b:filtered)bookLabels.add(b.optString("title")+" · "+b.optString("author")+" (#"+b.optLong("id")+")");
+        ArrayAdapter<String> bookAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,bookLabels);
+        bs.setAdapter(bookAdapter);body.addView(bs,new LinearLayout.LayoutParams(-1,dp(64)));
+        TextView bookCount=text(body,filtered.size()+" livro(s) disponível(is)",14);
+
+        int select=0;for(int i=0;i<filtered.size();i++)if(filtered.get(i).optLong("id")==preselected){select=i;break;}
+        bs.setSelection(select);
+
+        bookFilter.addTextChangedListener(watcher(()->{
+            String term=bookFilter.getText().toString().trim().toLowerCase(Locale.ROOT);
+            filtered.clear();bookLabels.clear();
+            for(JSONObject b:available){
+                String title=b.optString("title").toLowerCase(Locale.ROOT);
+                String author=b.optString("author").toLowerCase(Locale.ROOT);
+                String id=String.valueOf(b.optLong("id"));
+                if(term.isEmpty()||title.contains(term)||author.contains(term)||id.contains(term)){
+                    filtered.add(b);bookLabels.add(b.optString("title")+" · "+b.optString("author")+" (#"+b.optLong("id")+")");
+                }
+            }
+            bookAdapter.notifyDataSetChanged();
+            bs.setEnabled(!filtered.isEmpty());
+            bookCount.setText(filtered.isEmpty()?"Nenhum livro encontrado":filtered.size()+" livro(s) encontrado(s)");
+            if(!filtered.isEmpty())bs.setSelection(0);
+        }));
+
         List<JSONObject> ps=db.rows("SELECT * FROM people ORDER BY name COLLATE NOCASE");String[] names=new String[ps.size()+1];names[0]="Cadastrar nova pessoa";for(int i=0;i<ps.size();i++)names[i+1]=ps.get(i).optString("name")+" (#"+ps.get(i).optLong("id")+")";
         text(body,"Quem ficará com o livro?",16);Spinner sp=new Spinner(this);sp.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));body.addView(sp,new LinearLayout.LayoutParams(-1,dp(64)));EditText name=input(body,"Nome da nova pessoa","");
         sp.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int position,long id){name.setVisibility(position==0?View.VISIBLE:View.GONE);}});
         button(body,"Confirmar empréstimo",()->{
-            int pos=sp.getSelectedItemPosition();String n=name.getText().toString().trim();if(pos==0&&n.isEmpty()){name.setError("Informe o nome");return;}JSONObject b=available.get(bs.getSelectedItemPosition());long person=pos==0?0:ps.get(pos-1).optLong("id");
+            if(filtered.isEmpty()){bookFilter.setError("Nenhum livro encontrado");return;}
+            int bookPos=bs.getSelectedItemPosition();if(bookPos<0||bookPos>=filtered.size()){toast("Selecione um livro.");return;}
+            int pos=sp.getSelectedItemPosition();String n=name.getText().toString().trim();if(pos==0&&n.isEmpty()){name.setError("Informe o nome");return;}JSONObject b=filtered.get(bookPos);long person=pos==0?0:ps.get(pos-1).optLong("id");
             String personName=pos==0?n:ps.get(pos-1).optString("name");
             Runnable commit=()->safe(()->{db.lend(b.optLong("id"),person,n);home();toast("Empréstimo registrado.");});
             if(pos==0){List<JSONObject> matches=db.rows("SELECT * FROM people WHERE lower(name)=lower(?)",n);if(!matches.isEmpty()){
@@ -143,6 +174,7 @@ public class MainActivity extends Activity {
             }}confirm("Emprestar livro?",b.optString("title")+" para "+personName,commit);
         });
     }
+
     private void people(){
         layout("Pessoas","people");List<JSONObject> ps=db.rows("SELECT p.id,p.name,COUNT(l.id) AS total FROM people p LEFT JOIN loans l ON l.person_id=p.id AND l.returned_at IS NULL GROUP BY p.id ORDER BY p.name COLLATE NOCASE");
         if(ps.isEmpty())text(body,"As pessoas são cadastradas durante o empréstimo.",17);
