@@ -51,10 +51,21 @@ public final class Db extends SQLiteOpenHelper {
         name=name.trim();if(name.isEmpty())throw new IllegalArgumentException("Informe o nome da pessoa.");
         ContentValues v=new ContentValues();v.put("name",name);return getWritableDatabase().insertOrThrow("people",null,v);
     }
-    public void lend(long book,long person,String newName){
+    public void lend(long book,long person,String newName){lendMany(Collections.singletonList(book),person,newName);}
+    public void lendMany(List<Long> books,long person,String newName){
+        if(books==null||books.isEmpty())throw new IllegalArgumentException("Selecione ao menos um livro.");
         SQLiteDatabase d=getWritableDatabase();d.beginTransaction();try{
-            if(person==0)person=savePerson(newName);
-            ContentValues v=new ContentValues();v.put("book_id",book);v.put("person_id",person);v.put("borrowed_at",System.currentTimeMillis());d.insertOrThrow("loans",null,v);d.setTransactionSuccessful();
+            if(person==0){
+                String name=newName==null?"":newName.trim();
+                if(name.isEmpty())throw new IllegalArgumentException("Informe o nome da pessoa.");
+                ContentValues pv=new ContentValues();pv.put("name",name);person=d.insertOrThrow("people",null,pv);
+            }
+            long now=System.currentTimeMillis();
+            for(Long book:books){
+                if(book==null||book<=0)throw new IllegalArgumentException("Livro inválido.");
+                ContentValues v=new ContentValues();v.put("book_id",book);v.put("person_id",person);v.put("borrowed_at",now);d.insertOrThrow("loans",null,v);
+            }
+            d.setTransactionSuccessful();
         }finally{d.endTransaction();}
     }
     public void giveBack(long loan){
