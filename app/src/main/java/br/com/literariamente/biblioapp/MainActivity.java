@@ -246,8 +246,19 @@ public class MainActivity extends Activity {
         text(body,"Selecionar pessoa existente",16);
         EditText personFilter=input(body,"Filtrar pessoa por nome ou ID","");
         TextView selectedPersonLabel=text(body,"Nenhuma pessoa selecionada",14);
+        ScrollView personScroll=new ScrollView(this);
+        personScroll.setNestedScrollingEnabled(true);
+        personScroll.setOnTouchListener((v,event)->{
+            int action=event.getActionMasked();
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)v.getParent().requestDisallowInterceptTouchEvent(true);
+            else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)v.getParent().requestDisallowInterceptTouchEvent(false);
+            return false;
+        });
+        LinearLayout.LayoutParams personScrollParams=new LinearLayout.LayoutParams(-1,dp(270));
+        personScrollParams.setMargins(0,dp(4),0,dp(10));
+        body.addView(personScroll,personScrollParams);
         RadioGroup personResults=new RadioGroup(this);personResults.setOrientation(RadioGroup.VERTICAL);
-        body.addView(personResults,new LinearLayout.LayoutParams(-1,-2));
+        personScroll.addView(personResults,new ScrollView.LayoutParams(-1,-2));
         final long[] selectedPersonId={0};
         final String[] selectedPersonName={""};
 
@@ -263,7 +274,7 @@ public class MainActivity extends Activity {
                 RadioButton option=new RadioButton(this);
                 long personId=p.optLong("id");
                 option.setText(personName+" (#"+personId+")");
-                option.setTextSize(16);option.setMinHeight(dp(48));
+                option.setTextSize(16);option.setMinHeight(dp(52));
                 option.setChecked(selectedPersonId[0]==personId);
                 option.setOnClickListener(v->{
                     selectedPersonId[0]=personId;
