@@ -195,7 +195,11 @@ public class MainActivity extends Activity {
 
         EditText bookFilter=input(body,"Filtrar livros por título, autor ou ID","");
         TextView selectedCount=text(body,"Nenhum livro selecionado",16);
-        LinearLayout bookList=new LinearLayout(this);bookList.setOrientation(1);body.addView(bookList);
+        ScrollView bookScroll=new ScrollView(this);
+        LinearLayout.LayoutParams bookScrollParams=new LinearLayout.LayoutParams(-1,dp(300));
+        bookScrollParams.setMargins(0,dp(4),0,dp(10));
+        body.addView(bookScroll,bookScrollParams);
+        LinearLayout bookList=new LinearLayout(this);bookList.setOrientation(1);bookScroll.addView(bookList,new ScrollView.LayoutParams(-1,-2));
         Set<Long> selectedBooks=new LinkedHashSet<>();
         if(preselected>0)selectedBooks.add(preselected);
 
