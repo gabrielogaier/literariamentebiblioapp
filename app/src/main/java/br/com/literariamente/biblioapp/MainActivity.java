@@ -168,7 +168,10 @@ public class MainActivity extends Activity {
         JSONObject b=provided;if(b==null&&id>0){List<JSONObject> found=db.rows("SELECT * FROM books WHERE id=?",""+id);if(!found.isEmpty())b=found.get(0);}if(b==null)b=new JSONObject();
         editing=id;layout(id==0?"Adicionar livro":"Editar livro","edit");
         pendingCover=b.optString("cover","");
-        if(!pendingCover.isEmpty()){text(body,"Capa",14).setTypeface(null,Typeface.BOLD);cover(body,pendingCover);}
+        text(body,"Foto do seu livro",14).setTypeface(null,Typeface.BOLD);
+        if(!pendingCover.isEmpty())cover(body,pendingCover);
+        button(body,pendingCover.isEmpty()?"📷  Fazer foto do livro":"📷  Refazer foto do livro",this::takeBookPhoto);
+        if(!pendingCover.isEmpty())button(body,"Remover foto",()->{pendingCover="";JSONObject current=draft();try{current.put("_initial",initial);}catch(Exception ignored){}edit(editing,current);});
         text(body,"Título e autor são obrigatórios. A avaliação é sua e pode ser alterada depois.",15);
         for(int i=0;i<BOOK_FIELDS.length;i++){
             EditText e=input(body,LABELS[i],b.optString(BOOK_FIELDS[i],""));fields.put(BOOK_FIELDS[i],e);
@@ -187,6 +190,22 @@ public class MainActivity extends Activity {
             safe(()->{long saved=db.saveBook(id,draft());book(saved);toast("Livro salvo.");});
         });
         button(body,"Cancelar",()->leave(()->{if(id>0)book(id);else books();}));
+    }
+    private void takeBookPhoto(){
+        Intent camera=new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+        if(camera.resolveActivity(getPackageManager())==null){toast("Nenhum aplicativo de câmera disponível.");return;}
+        try{startActivityForResult(camera,43);}catch(Exception e){toast("Não foi possível abrir a câmera.");}
+    }
+    private String encodePhoto(Bitmap bitmap){
+        if(bitmap==null)return "";
+        int max=900,w=bitmap.getWidth(),h=bitmap.getHeight();
+        if(w>max||h>max){
+            float scale=Math.min((float)max/w,(float)max/h);
+            bitmap=Bitmap.createScaledBitmap(bitmap,Math.max(1,Math.round(w*scale)),Math.max(1,Math.round(h*scale)),true);
+        }
+        ByteArrayOutputStream out=new ByteArrayOutputStream();
+        bitmap.compress(Bitmap.CompressFormat.JPEG,88,out);
+        return Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);
     }
     private void search(){
         JSONObject d=draft();String t=d.optString("title"),a=d.optString("author");
@@ -213,10 +232,9 @@ public class MainActivity extends Activity {
         ProgressDialog progress=ProgressDialog.show(this,"Carregando informações","Buscando título, autor e ano...",true,true);
         worker.execute(()->{try{JSONObject info=BookSearch.details(result);runOnUiThread(()->{
             if(isFinishing()||isDestroyed())return;boolean canceled=!progress.isShowing();progress.dismiss();if(canceled||generation!=token)return;
-            confirm("Usar estas informações?","Título, autor, ano e capa disponível serão preenchidos. Sua avaliação não será alterada.",()->{
+            confirm("Usar estas informações?","Título, autor e ano encontrados serão preenchidos. Sua avaliação e a foto do livro não serão alteradas.",()->{
                 for(String f:BOOK_FIELDS)if(!info.optString(f).isEmpty())fields.get(f).setText(info.optString(f));
-                if(!info.optString("cover","").isEmpty())pendingCover=info.optString("cover");
-                toast(info.optString("cover","").isEmpty()?"Informações preenchidas.":"Informações e capa preenchidas.");
+                toast("Informações preenchidas. Revise e toque em Salvar.");
             });
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível carregar os detalhes. Continue manualmente.");});}});
     }
@@ -396,7 +414,16 @@ public class MainActivity extends Activity {
     private void exportBackup(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");i.putExtra(Intent.EXTRA_TITLE,"literariamente-backup-"+new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+".json");safe(()->startActivityForResult(i,41));}
     private void importBackup(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("*/*");safe(()->startActivityForResult(i,42));}
     @Override protected void onActivityResult(int request,int result,Intent data){
-        super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;android.net.Uri uri=data.getData();
+        super.onActivityResult(request,result,data);
+        if(request==43){
+            if(result!=RESULT_OK||data==null)return;
+            Bundle extras=data.getExtras();Bitmap bitmap=extras==null?null:(Bitmap)extras.get("data");
+            if(bitmap==null){toast("Não foi possível obter a foto.");return;}
+            pendingCover=encodePhoto(bitmap);
+            JSONObject current=draft();try{current.put("_initial",initial);}catch(Exception ignored){}
+            edit(editing,current);toast("Foto do livro adicionada.");return;
+        }
+        if(result!=RESULT_OK||data==null||data.getData()==null)return;android.net.Uri uri=data.getData();
         if(request==41)worker.execute(()->{try{byte[] bytes=db.backup().toString(2).getBytes("UTF-8");if(bytes.length>50*1024*1024)throw new IOException("Backup excede 50 MB.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Arquivo indisponível");out.write(bytes);}runOnUiThread(()->{if(!isDestroyed())toast("Backup exportado. Guarde uma cópia fora do celular.");});}catch(Exception e){runOnUiThread(()->{if(!isDestroyed())toast("Falha ao exportar o backup. Tente outro local.");});}});
         if(request==42)worker.execute(()->{try{JSONObject backup;try(InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){
             if(in==null)throw new IOException();byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){if(out.size()+n>50*1024*1024)throw new IOException("Backup maior que 50 MB.");out.write(b,0,n);}backup=new JSONObject(out.toString("UTF-8"));}
