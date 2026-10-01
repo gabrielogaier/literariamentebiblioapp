@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -55,3 +58,11 @@ jobs:
         with:
           name: Literariamente-Biblio
           path: app/build/outputs/apk/release/Literariamente-Biblio.apk
+
+      - name: Publicar Release
+        if: github.event_name == 'push' && github.event.head_commit.message == 'Publica release do Literariamente'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v1.0.${GITHUB_RUN_NUMBER}"
+          gh release create "$VERSION"             app/build/outputs/apk/release/Literariamente-Biblio.apk             --repo "${GITHUB_REPOSITORY}"             --target "${GITHUB_SHA}"             --title "Literariamente $VERSION"             --notes "Primeira versão pública do Literariamente. Biblioteca pessoal Android com livros, avaliações, empréstimos, histórico, backup local e foto do próprio exemplar."
