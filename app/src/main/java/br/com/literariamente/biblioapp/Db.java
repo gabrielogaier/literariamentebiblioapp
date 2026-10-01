@@ -10,7 +10,7 @@ import java.util.*;
 public final class Db extends SQLiteOpenHelper {
     static final String[] LEGACY_BOOK_FIELDS={"title","author","subtitle","publisher","year","isbn","pages","description","language","cover"};
     public Db(Context c){this(c,"library.db");}
-    Db(Context c,String filename){super(c,filename,null,2);}
+    Db(Context c,String filename){super(c,filename,null,3);}
     @Override public void onConfigure(SQLiteDatabase d){d.setForeignKeyConstraintsEnabled(true);}
     @Override public void onCreate(SQLiteDatabase d){
         d.execSQL("CREATE TABLE books(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL CHECK(length(trim(title))>0),author TEXT NOT NULL CHECK(length(trim(author))>0),subtitle TEXT NOT NULL DEFAULT '',publisher TEXT NOT NULL DEFAULT '',year TEXT NOT NULL DEFAULT '',isbn TEXT NOT NULL DEFAULT '',pages TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',language TEXT NOT NULL DEFAULT '',cover TEXT NOT NULL DEFAULT '',rating INTEGER NOT NULL DEFAULT 0 CHECK(rating BETWEEN 0 AND 5))");
@@ -18,9 +18,11 @@ public final class Db extends SQLiteOpenHelper {
         d.execSQL("CREATE TABLE loans(id INTEGER PRIMARY KEY AUTOINCREMENT,book_id INTEGER NOT NULL REFERENCES books(id),person_id INTEGER NOT NULL REFERENCES people(id),borrowed_at INTEGER NOT NULL CHECK(borrowed_at>0),returned_at INTEGER CHECK(returned_at IS NULL OR returned_at>=borrowed_at))");
         d.execSQL("CREATE UNIQUE INDEX one_active_loan ON loans(book_id) WHERE returned_at IS NULL");
         d.execSQL("CREATE INDEX person_loans ON loans(person_id,returned_at)");
+        d.execSQL("CREATE TABLE wishlist(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL CHECK(length(trim(title))>0),author TEXT NOT NULL CHECK(length(trim(author))>0))");
     }
     @Override public void onUpgrade(SQLiteDatabase d,int old,int next){
         if(old<2)d.execSQL("ALTER TABLE books ADD COLUMN rating INTEGER NOT NULL DEFAULT 0 CHECK(rating BETWEEN 0 AND 5)");
+        if(old<3)d.execSQL("CREATE TABLE wishlist(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL CHECK(length(trim(title))>0),author TEXT NOT NULL CHECK(length(trim(author))>0))");
     }
     public List<JSONObject> rows(String sql,String... args){
         List<JSONObject> result=new ArrayList<>();
@@ -47,6 +49,15 @@ public final class Db extends SQLiteOpenHelper {
         if(v.getAsString("title").isEmpty()||v.getAsString("author").isEmpty())throw new IllegalArgumentException("Informe título e autor.");
         if(id==0)return getWritableDatabase().insertOrThrow("books",null,v);
         if(getWritableDatabase().update("books",v,"id=?",new String[]{""+id})!=1)throw new IllegalArgumentException("Livro não encontrado.");return id;
+    }
+    public long saveWish(String title,String author){
+        title=title==null?"":title.trim();author=author==null?"":author.trim();
+        if(title.isEmpty()||author.isEmpty())throw new IllegalArgumentException("Informe título e autor.");
+        ContentValues v=new ContentValues();v.put("title",title);v.put("author",author);
+        return getWritableDatabase().insertOrThrow("wishlist",null,v);
+    }
+    public void deleteWish(long id){
+        if(getWritableDatabase().delete("wishlist","id=?",new String[]{""+id})!=1)throw new IllegalArgumentException("Desejo não encontrado.");
     }
     public long savePerson(String name){
         name=name.trim();if(name.isEmpty())throw new IllegalArgumentException("Informe o nome da pessoa.");
@@ -75,16 +86,17 @@ public final class Db extends SQLiteOpenHelper {
     }
     public JSONObject backup() throws JSONException {
         SQLiteDatabase d=getWritableDatabase();d.beginTransaction();try{
-        JSONObject root=new JSONObject();root.put("format","literariamente-biblioapp");root.put("version",2);root.put("createdAt",System.currentTimeMillis());
-        for(String t:new String[]{"books","people","loans"})root.put(t,new JSONArray(rows("SELECT * FROM "+t+" ORDER BY id")));d.setTransactionSuccessful();return root;
+        JSONObject root=new JSONObject();root.put("format","literariamente-biblioapp");root.put("version",3);root.put("createdAt",System.currentTimeMillis());
+        for(String t:new String[]{"books","people","loans","wishlist"})root.put(t,new JSONArray(rows("SELECT * FROM "+t+" ORDER BY id")));d.setTransactionSuccessful();return root;
         }finally{d.endTransaction();}
     }
     /** Validate before deleting; the SQLite transaction rolls back every change on error. */
     public void restore(JSONObject root) throws JSONException {
         int backupVersion=root.optInt("version");
-        if(!"literariamente-biblioapp".equals(root.optString("format"))||(backupVersion!=1&&backupVersion!=2))throw new IllegalArgumentException("Formato de backup não reconhecido.");
+        if(!"literariamente-biblioapp".equals(root.optString("format"))||(backupVersion<1||backupVersion>3))throw new IllegalArgumentException("Formato de backup não reconhecido.");
         JSONArray books=root.getJSONArray("books"),people=root.getJSONArray("people"),loans=root.getJSONArray("loans");
-        if(books.length()>100000||people.length()>100000||loans.length()>500000)throw new IllegalArgumentException("Backup excede o limite de registros.");
+        JSONArray wishlist=backupVersion>=3?root.optJSONArray("wishlist"):new JSONArray();if(wishlist==null)wishlist=new JSONArray();
+        if(books.length()>100000||people.length()>100000||loans.length()>500000||wishlist.length()>100000)throw new IllegalArgumentException("Backup excede o limite de registros.");
         Set<Long> bids=new HashSet<>(),pids=new HashSet<>(),lids=new HashSet<>(),active=new HashSet<>();
         for(int i=0;i<books.length();i++){
             JSONObject o=books.getJSONObject(i);validId(o,bids);
@@ -93,6 +105,8 @@ public final class Db extends SQLiteOpenHelper {
             if(o.getString("title").trim().isEmpty()||o.getString("author").trim().isEmpty())throw new IllegalArgumentException("Livro sem título ou autor.");
         }
         for(int i=0;i<people.length();i++){JSONObject o=people.getJSONObject(i);validId(o,pids);if(!(o.get("name") instanceof String)||o.getString("name").trim().isEmpty())throw new IllegalArgumentException("Pessoa sem nome.");}
+        Set<Long> wids=new HashSet<>();
+        for(int i=0;i<wishlist.length();i++){JSONObject o=wishlist.getJSONObject(i);validId(o,wids);if(!(o.get("title") instanceof String)||!(o.get("author") instanceof String)||o.getString("title").trim().isEmpty()||o.getString("author").trim().isEmpty())throw new IllegalArgumentException("Desejo inválido.");}
         for(int i=0;i<loans.length();i++){
             JSONObject o=loans.getJSONObject(i);validId(o,lids);long b=integer(o,"book_id"),p=integer(o,"person_id"),start=integer(o,"borrowed_at");
             if(!bids.contains(b)||!pids.contains(p)||start<=0)throw new IllegalArgumentException("Referência de empréstimo inválida.");
@@ -101,10 +115,11 @@ public final class Db extends SQLiteOpenHelper {
             else if(integer(o,"returned_at")<start)throw new IllegalArgumentException("Data de devolução inválida.");
         }
         SQLiteDatabase d=getWritableDatabase();d.beginTransaction();try{
-            d.delete("loans",null,null);d.delete("people",null,null);d.delete("books",null,null);
+            d.delete("loans",null,null);d.delete("wishlist",null,null);d.delete("people",null,null);d.delete("books",null,null);
             for(int i=0;i<books.length();i++){JSONObject o=books.getJSONObject(i);ContentValues v=new ContentValues();v.put("id",o.getLong("id"));for(String f:LEGACY_BOOK_FIELDS)if(o.has(f))v.put(f,o.optString(f,""));v.put("rating",o.optInt("rating",0));d.insertOrThrow("books",null,v);}
             for(int i=0;i<people.length();i++){JSONObject o=people.getJSONObject(i);ContentValues v=new ContentValues();v.put("id",o.getLong("id"));v.put("name",o.getString("name"));d.insertOrThrow("people",null,v);}
             for(int i=0;i<loans.length();i++){JSONObject o=loans.getJSONObject(i);ContentValues v=new ContentValues();for(String f:new String[]{"id","book_id","person_id","borrowed_at"})v.put(f,o.getLong(f));if(o.isNull("returned_at"))v.putNull("returned_at");else v.put("returned_at",o.getLong("returned_at"));d.insertOrThrow("loans",null,v);}
+            for(int i=0;i<wishlist.length();i++){JSONObject o=wishlist.getJSONObject(i);ContentValues v=new ContentValues();v.put("id",o.getLong("id"));v.put("title",o.getString("title"));v.put("author",o.getString("author"));d.insertOrThrow("wishlist",null,v);}
             d.setTransactionSuccessful();
         }finally{d.endTransaction();}
     }

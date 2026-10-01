@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
         if(page.equals("edit")){
             JSONObject draft=null;try{if(state!=null&&state.getBoolean("hasDraft")){try(FileInputStream in=openFileInput("editor-draft.json");ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);draft=new JSONObject(out.toString("UTF-8"));}}}catch(Exception ignored){}
             edit(editing,draft);
-        }else if(page.equals("book"))book(selected);else if(page.equals("person"))person(selected);else if(page.equals("people"))people();else if(page.equals("history"))history();else if(page.equals("books"))books();else if(page.equals("lend"))lend(selected);else home();
+        }else if(page.equals("book"))book(selected);else if(page.equals("person"))person(selected);else if(page.equals("people"))people();else if(page.equals("history"))history();else if(page.equals("books"))books();else if(page.equals("lend"))lend(selected);else if(page.equals("wishlist"))wishlist();else home();
     }
     @Override protected void onSaveInstanceState(Bundle s){super.onSaveInstanceState(s);s.putString("page",page);s.putLong("selected",selected);s.putLong("editing",editing);if(page.equals("edit")){try{JSONObject d=draft();d.put("_initial",initial);try(FileOutputStream out=openFileOutput("editor-draft.json",MODE_PRIVATE)){out.write(d.toString().getBytes("UTF-8"));}s.putBoolean("hasDraft",true);}catch(Exception ignored){}}}
     @Override protected void onDestroy(){worker.shutdownNow();super.onDestroy();}
@@ -83,6 +83,7 @@ public class MainActivity extends Activity {
         primaryButton(body,"＋ Adicionar livro",()->edit(0,null));
         button(body,"▤  Meus livros",this::books);
         button(body,"⇄  Empréstimos",()->lend(0));
+        button(body,"♡  Desejos",this::wishlist);
         button(body,"●  Pessoas",this::people);
         button(body,"◷  Histórico",this::history);
         List<JSONObject> people=db.rows("SELECT p.id,p.name,COUNT(*) AS total FROM people p JOIN loans l ON l.person_id=p.id WHERE l.returned_at IS NULL GROUP BY p.id ORDER BY p.name COLLATE NOCASE");
@@ -366,6 +367,40 @@ public class MainActivity extends Activity {
             }
             confirm("Confirmar empréstimo?",message,commit);
         });
+    }
+
+    private void wishlist(){
+        layout("Desejos","wishlist");
+        int total=db.count("SELECT COUNT(*) FROM wishlist");
+        text(body,total==0?"Sua lista de desejos está vazia.":total+" livro(s) nos desejos",15);
+        LinearLayout form=card(body);
+        TextView formTitle=text(form,"Adicionar desejo",19);formTitle.setTypeface(Typeface.SERIF,Typeface.BOLD);
+        EditText title=input(form,"Título *","");
+        EditText author=input(form,"Autor *","");
+        primaryButton(form,"Salvar desejo",()->{
+            String t=title.getText().toString().trim(),a=author.getText().toString().trim();
+            if(t.isEmpty()){title.setError("Informe o título");return;}
+            if(a.isEmpty()){author.setError("Informe o autor");return;}
+            safe(()->{db.saveWish(t,a);wishlist();toast("Adicionado aos desejos.");});
+        });
+
+        List<JSONObject> wishes=db.rows("SELECT * FROM wishlist ORDER BY title COLLATE NOCASE");
+        for(JSONObject w:wishes){
+            LinearLayout c=card(body);
+            LinearLayout top=new LinearLayout(this);top.setOrientation(LinearLayout.HORIZONTAL);top.setGravity(Gravity.CENTER_VERTICAL);c.addView(top,new LinearLayout.LayoutParams(-1,-2));
+            LinearLayout info=new LinearLayout(this);info.setOrientation(1);top.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+            TextView t=text(info,w.optString("title"),19);t.setTypeface(Typeface.SERIF,Typeface.BOLD);
+            text(info,w.optString("author"),15);
+            TextView remove=new TextView(this);remove.setText("×");remove.setTextSize(28);remove.setTextColor(wine);remove.setGravity(Gravity.CENTER);
+            top.addView(remove,new LinearLayout.LayoutParams(dp(48),dp(48)));
+            remove.setOnClickListener(v->confirm("Remover dos desejos?","Remover “"+w.optString("title")+"” da sua lista?",()->safe(()->{db.deleteWish(w.optLong("id"));wishlist();toast("Removido dos desejos.");})));
+            primaryButton(c,"Comprei",()->confirm("Adicionar à estante?","Abrir o cadastro de “"+w.optString("title")+"” já preenchido?",()->safe(()->{
+                db.deleteWish(w.optLong("id"));
+                JSONObject book=new JSONObject();
+                try{book.put("title",w.optString("title"));book.put("author",w.optString("author"));}catch(Exception ignored){}
+                edit(0,book);
+            })));
+        }
     }
 
     private void people(){
