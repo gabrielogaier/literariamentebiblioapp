@@ -1,5 +1,7 @@
 plugins { id 'com.android.application' }
 
+def buildNumber = providers.gradleProperty("appVersionCode").orElse("1").get().toInteger()
+
 android {
     namespace 'br.com.literariamente.biblioapp'
     compileSdk 35
@@ -8,18 +10,18 @@ android {
         applicationId 'br.com.literariamente.biblioapp'
         minSdk 23
         targetSdk 35
-        versionCode (project.findProperty("appVersionCode") ?: "1").toInteger()
-        versionName "1.0." + (project.findProperty("appVersionCode") ?: "0")
+        versionCode = buildNumber
+        versionName = "1.0." + buildNumber
     }
 
     signingConfigs {
         release {
             def keystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
             if (keystorePath) {
-                storeFile file(keystorePath)
-                storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
-                keyAlias System.getenv("ANDROID_KEY_ALIAS")
-                keyPassword System.getenv("ANDROID_KEY_PASSWORD")
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
             }
         }
     }
@@ -32,7 +34,7 @@ android {
     buildTypes {
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            signingConfig = signingConfigs.release
         }
     }
 }
