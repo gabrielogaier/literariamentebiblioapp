@@ -197,6 +197,13 @@ public class MainActivity extends Activity {
         TextView selectedCount=text(body,"Nenhum livro selecionado",16);
         ListView bookList=new ListView(this);
         bookList.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
+        bookList.setNestedScrollingEnabled(true);
+        bookList.setOnTouchListener((v,event)->{
+            int action=event.getActionMasked();
+            if(action==MotionEvent.ACTION_DOWN||action==MotionEvent.ACTION_MOVE)v.getParent().requestDisallowInterceptTouchEvent(true);
+            else if(action==MotionEvent.ACTION_UP||action==MotionEvent.ACTION_CANCEL)v.getParent().requestDisallowInterceptTouchEvent(false);
+            return false;
+        });
         LinearLayout.LayoutParams bookListParams=new LinearLayout.LayoutParams(-1,dp(270));
         bookListParams.setMargins(0,dp(4),0,dp(10));
         body.addView(bookList,bookListParams);
