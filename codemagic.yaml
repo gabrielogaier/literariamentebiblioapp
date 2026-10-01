@@ -1,0 +1,17 @@
+workflows:
+  android-debug:
+    name: Literariamente - APK de teste
+    max_build_duration: 30
+    instance_type: linux_x2
+    environment:
+      java: 17
+    scripts:
+      - name: Configurar SDK Android
+        script: |
+          printf 'sdk.dir=%s\n' "$ANDROID_SDK_ROOT" > "$CM_BUILD_DIR/local.properties"
+      - name: Gerar APK
+        script: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+    artifacts:
+      - app/build/outputs/apk/debug/*.apk
