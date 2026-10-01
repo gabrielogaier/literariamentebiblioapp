@@ -112,8 +112,18 @@ public class MainActivity extends Activity {
         worker.execute(()->{try{JSONArray results=BookSearch.search(t,a,isbn);runOnUiThread(()->{
             if(isFinishing()||isDestroyed())return;boolean canceled=!progress.isShowing();progress.dismiss();if(canceled||generation!=token)return;
             if(results.length()==0){toast("Nenhum resultado. Continue o cadastro manual.");return;}
-            String[] labels=new String[results.length()];for(int i=0;i<labels.length;i++){JSONObject r=results.optJSONObject(i);labels[i]=r.optString("title")+"\n"+BookSearch.first(r,"author_name");}
-            new AlertDialog.Builder(this).setTitle("Escolha o livro (edição da fonte)").setItems(labels,(dialog,index)->loadDetails(results.optJSONObject(index),token)).setNegativeButton("Cancelar",null).show();
+            String[] labels=new String[results.length()];
+            for(int i=0;i<labels.length;i++){
+                JSONObject r=results.optJSONObject(i);
+                String meta=BookSearch.first(r,"author_name");
+                String year=BookSearch.resultYear(r),lang=BookSearch.resultLanguage(r);
+                if(!year.isEmpty())meta+=(meta.isEmpty()?"":" · ")+year;
+                if(!lang.isEmpty())meta+=(meta.isEmpty()?"":" · ")+lang;
+                labels[i]=BookSearch.resultTitle(r)+"\n"+meta;
+            }
+            AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Escolha o livro").setItems(labels,(d,index)->loadDetails(results.optJSONObject(index),token)).setNegativeButton("Cancelar",null).create();
+            dialog.setOnShowListener(v->{ListView list=dialog.getListView();list.setDivider(new android.graphics.drawable.ColorDrawable(Color.rgb(220,220,220)));list.setDividerHeight(dp(1));});
+            dialog.show();
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível consultar. Você pode salvar normalmente com título e autor.");});}});
     }
     private void loadDetails(JSONObject result,int token){
