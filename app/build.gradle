@@ -8,8 +8,8 @@ android {
         applicationId 'br.com.literariamente.biblioapp'
         minSdk 23
         targetSdk 35
-        versionCode (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
-        versionName "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
+        versionCode (project.findProperty("appVersionCode") ?: "1").toInteger()
+        versionName "1.0." + (project.findProperty("appVersionCode") ?: "0")
     }
 
     signingConfigs {
