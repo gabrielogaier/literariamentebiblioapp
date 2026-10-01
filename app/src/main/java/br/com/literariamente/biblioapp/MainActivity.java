@@ -198,13 +198,13 @@ public class MainActivity extends Activity {
     }
     private String encodePhoto(Bitmap bitmap){
         if(bitmap==null)return "";
-        int max=900,w=bitmap.getWidth(),h=bitmap.getHeight();
+        int max=600,w=bitmap.getWidth(),h=bitmap.getHeight();
         if(w>max||h>max){
             float scale=Math.min((float)max/w,(float)max/h);
             bitmap=Bitmap.createScaledBitmap(bitmap,Math.max(1,Math.round(w*scale)),Math.max(1,Math.round(h*scale)),true);
         }
         ByteArrayOutputStream out=new ByteArrayOutputStream();
-        bitmap.compress(Bitmap.CompressFormat.JPEG,88,out);
+        bitmap.compress(Bitmap.CompressFormat.JPEG,70,out);
         return Base64.encodeToString(out.toByteArray(),Base64.NO_WRAP);
     }
     private void search(){
