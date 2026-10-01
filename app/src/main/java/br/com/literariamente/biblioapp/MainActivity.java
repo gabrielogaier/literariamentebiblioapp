@@ -196,7 +196,7 @@ public class MainActivity extends Activity {
         EditText bookFilter=input(body,"Filtrar livros por título, autor ou ID","");
         TextView selectedCount=text(body,"Nenhum livro selecionado",16);
         ScrollView bookScroll=new ScrollView(this);
-        LinearLayout.LayoutParams bookScrollParams=new LinearLayout.LayoutParams(-1,dp(300));
+        LinearLayout.LayoutParams bookScrollParams=new LinearLayout.LayoutParams(-1,dp(270));
         bookScrollParams.setMargins(0,dp(4),0,dp(10));
         body.addView(bookScroll,bookScrollParams);
         LinearLayout bookList=new LinearLayout(this);bookList.setOrientation(1);bookScroll.addView(bookList,new ScrollView.LayoutParams(-1,-2));
@@ -216,7 +216,7 @@ public class MainActivity extends Activity {
                 CheckBox check=new CheckBox(this);
                 long bookId=b.optLong("id");
                 check.setText(b.optString("title")+" · "+b.optString("author")+" (#"+bookId+")");
-                check.setTextSize(16);check.setPadding(0,dp(4),0,dp(4));
+                check.setTextSize(16);check.setMinHeight(dp(52));check.setPadding(0,dp(6),0,dp(6));
                 check.setChecked(selectedBooks.contains(bookId));
                 check.setOnCheckedChangeListener((button,isChecked)->{
                     if(isChecked)selectedBooks.add(bookId);else selectedBooks.remove(bookId);
