@@ -1,6 +1,6 @@
 workflows:
   android-debug:
-    name: Literariamente - APK de teste
+    name: Literariamente - Bíblio App
     max_build_duration: 30
     instance_type: linux_x2
     environment:
