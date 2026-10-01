@@ -189,42 +189,45 @@ public class MainActivity extends Activity {
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível carregar os detalhes. Continue manualmente.");});}});
     }
     private void lend(long preselected){
-        selected=preselected;layout("Emprestar","lend");List<JSONObject> available=db.rows("SELECT b.id,b.title,b.author FROM books b WHERE NOT EXISTS(SELECT 1 FROM loans l WHERE l.book_id=b.id AND l.returned_at IS NULL) ORDER BY b.title COLLATE NOCASE");
+        selected=preselected;layout("Emprestar","lend");
+        List<JSONObject> available=db.rows("SELECT b.id,b.title,b.author FROM books b WHERE NOT EXISTS(SELECT 1 FROM loans l WHERE l.book_id=b.id AND l.returned_at IS NULL) ORDER BY b.title COLLATE NOCASE");
         if(available.isEmpty()){text(body,"Não há livros disponíveis para emprestar.",18);button(body,"Cadastrar livro",()->edit(0,null));return;}
 
-        EditText bookFilter=input(body,"Filtrar livro por título, autor ou ID","");
-        text(body,"Livro disponível",16);
-        Spinner bs=new Spinner(this);
-        ArrayList<JSONObject> filtered=new ArrayList<>(available);
-        ArrayList<String> bookLabels=new ArrayList<>();
-        for(JSONObject b:filtered)bookLabels.add(b.optString("title")+" · "+b.optString("author")+" (#"+b.optLong("id")+")");
-        ArrayAdapter<String> bookAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,bookLabels);
-        bs.setAdapter(bookAdapter);body.addView(bs,new LinearLayout.LayoutParams(-1,dp(64)));
-        TextView bookCount=text(body,filtered.size()+" livro(s) disponível(is)",14);
+        EditText bookFilter=input(body,"Filtrar livros por título, autor ou ID","");
+        TextView selectedCount=text(body,"Nenhum livro selecionado",16);
+        LinearLayout bookList=new LinearLayout(this);bookList.setOrientation(1);body.addView(bookList);
+        Set<Long> selectedBooks=new LinkedHashSet<>();
+        if(preselected>0)selectedBooks.add(preselected);
 
-        int select=0;for(int i=0;i<filtered.size();i++)if(filtered.get(i).optLong("id")==preselected){select=i;break;}
-        bs.setSelection(select);
-
-        bookFilter.addTextChangedListener(watcher(()->{
+        Runnable renderBooks=()->{
+            bookList.removeAllViews();
             String term=bookFilter.getText().toString().trim().toLowerCase(Locale.ROOT);
-            filtered.clear();bookLabels.clear();
+            int shown=0;
             for(JSONObject b:available){
                 String title=b.optString("title").toLowerCase(Locale.ROOT);
                 String author=b.optString("author").toLowerCase(Locale.ROOT);
                 String id=String.valueOf(b.optLong("id"));
-                if(term.isEmpty()||title.contains(term)||author.contains(term)||id.contains(term)){
-                    filtered.add(b);bookLabels.add(b.optString("title")+" · "+b.optString("author")+" (#"+b.optLong("id")+")");
-                }
+                if(!term.isEmpty()&&!title.contains(term)&&!author.contains(term)&&!id.contains(term))continue;
+                shown++;
+                CheckBox check=new CheckBox(this);
+                long bookId=b.optLong("id");
+                check.setText(b.optString("title")+" · "+b.optString("author")+" (#"+bookId+")");
+                check.setTextSize(16);check.setPadding(0,dp(4),0,dp(4));
+                check.setChecked(selectedBooks.contains(bookId));
+                check.setOnCheckedChangeListener((button,isChecked)->{
+                    if(isChecked)selectedBooks.add(bookId);else selectedBooks.remove(bookId);
+                    selectedCount.setText(selectedBooks.isEmpty()?"Nenhum livro selecionado":selectedBooks.size()+" livro(s) selecionado(s)");
+                });
+                bookList.addView(check,new LinearLayout.LayoutParams(-1,-2));
             }
-            bookAdapter.notifyDataSetChanged();
-            bs.setEnabled(!filtered.isEmpty());
-            bookCount.setText(filtered.isEmpty()?"Nenhum livro encontrado":filtered.size()+" livro(s) encontrado(s)");
-            if(!filtered.isEmpty())bs.setSelection(0);
-        }));
+            if(shown==0)text(bookList,"Nenhum livro encontrado.",15);
+            selectedCount.setText(selectedBooks.isEmpty()?"Nenhum livro selecionado":selectedBooks.size()+" livro(s) selecionado(s)");
+        };
+        bookFilter.addTextChangedListener(watcher(renderBooks));renderBooks.run();
 
         List<JSONObject> ps=db.rows("SELECT * FROM people ORDER BY name COLLATE NOCASE");
         EditText personFilter=input(body,"Filtrar pessoa por nome ou ID","");
-        text(body,"Quem ficará com o livro?",16);
+        text(body,"Quem ficará com os livros?",16);
         Spinner sp=new Spinner(this);
         ArrayList<JSONObject> filteredPeople=new ArrayList<>();
         ArrayList<String> personLabels=new ArrayList<>();
@@ -252,18 +255,24 @@ public class MainActivity extends Activity {
         }));
 
         button(body,"Confirmar empréstimo",()->{
-            if(filtered.isEmpty()){bookFilter.setError("Nenhum livro encontrado");return;}
-            int bookPos=bs.getSelectedItemPosition();if(bookPos<0||bookPos>=filtered.size()){toast("Selecione um livro.");return;}
+            if(selectedBooks.isEmpty()){toast("Selecione ao menos um livro.");return;}
             int pos=sp.getSelectedItemPosition();String n=name.getText().toString().trim();
             if(pos==0&&n.isEmpty()){name.setError("Informe o nome");return;}
-            JSONObject b=filtered.get(bookPos);
             JSONObject selectedPerson=pos==0?null:filteredPeople.get(pos-1);
             long person=selectedPerson==null?0:selectedPerson.optLong("id");
             String personName=selectedPerson==null?n:selectedPerson.optString("name");
-            Runnable commit=()->safe(()->{db.lend(b.optLong("id"),person,n);home();toast("Empréstimo registrado.");});
-            if(pos==0){List<JSONObject> matches=db.rows("SELECT * FROM people WHERE lower(name)=lower(?)",n);if(!matches.isEmpty()){
-                new AlertDialog.Builder(this).setTitle("Já existe uma pessoa com esse nome").setMessage("Usar o cadastro existente? Se forem pessoas diferentes, cancele e selecione ou cadastre um nome identificável.").setNegativeButton("Cancelar",null).setPositiveButton("Usar existente",(dlg,w)->confirm("Emprestar livro?",b.optString("title")+" para "+personName,()->safe(()->{db.lend(b.optLong("id"),matches.get(0).optLong("id"),"");home();}))).show();return;
-            }}confirm("Emprestar livro?",b.optString("title")+" para "+personName,commit);
+            ArrayList<Long> booksToLend=new ArrayList<>(selectedBooks);
+            String message=booksToLend.size()+" livro(s) para "+personName;
+            Runnable commit=()->safe(()->{db.lendMany(booksToLend,person,n);home();toast(booksToLend.size()+" empréstimo(s) registrado(s).");});
+            if(pos==0){
+                List<JSONObject> matches=db.rows("SELECT * FROM people WHERE lower(name)=lower(?)",n);
+                if(!matches.isEmpty()){
+                    long existingPerson=matches.get(0).optLong("id");
+                    new AlertDialog.Builder(this).setTitle("Já existe uma pessoa com esse nome").setMessage("Usar o cadastro existente?").setNegativeButton("Cancelar",null).setPositiveButton("Usar existente",(dlg,w)->confirm("Confirmar empréstimo?",booksToLend.size()+" livro(s) para "+n,()->safe(()->{db.lendMany(booksToLend,existingPerson,"");home();toast(booksToLend.size()+" empréstimo(s) registrado(s).");}))).show();
+                    return;
+                }
+            }
+            confirm("Confirmar empréstimo?",message,commit);
         });
     }
 
