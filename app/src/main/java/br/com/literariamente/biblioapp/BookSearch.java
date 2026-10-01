@@ -17,9 +17,50 @@ public final class BookSearch {
     }
     static JSONObject json(String url)throws Exception{return new JSONObject(new String(fetch(url,5*1024*1024),"UTF-8"));}
     static String enc(String s)throws Exception{return URLEncoder.encode(s,"UTF-8");}
+    static JSONArray searchDocs(String query)throws Exception{
+        JSONObject result=json("https://openlibrary.org/search.json?"+query+"&limit=15&fields=key,title,author_name,edition_key,first_publish_year");
+        JSONArray docs=result.optJSONArray("docs");
+        return docs==null?new JSONArray():docs;
+    }
     public static JSONArray search(String title,String author,String isbn)throws Exception{
-        String query=isbn.trim().isEmpty()?"title="+enc(title)+"&author="+enc(author):"q="+enc("isbn:"+isbn.replaceAll("[^0-9Xx]",""));
-        return json("https://openlibrary.org/search.json?"+query+"&limit=15&fields=key,title,author_name,edition_key,first_publish_year").getJSONArray("docs");
+        title=title==null?"":title.trim();
+        author=author==null?"":author.trim();
+        isbn=isbn==null?"":isbn.replaceAll("[^0-9Xx]","").trim();
+
+        JSONArray docs;
+
+        if(!isbn.isEmpty()){
+            docs=searchDocs("isbn="+enc(isbn));
+            if(docs.length()>0)return docs;
+        }
+
+        if(!title.isEmpty()&&!author.isEmpty()){
+            docs=searchDocs("title="+enc(title)+"&author="+enc(author));
+            if(docs.length()>0)return docs;
+        }
+
+        if(!title.isEmpty()){
+            docs=searchDocs("title="+enc(title));
+            if(docs.length()>0)return docs;
+        }
+
+        StringBuilder general=new StringBuilder();
+        if(!title.isEmpty())general.append(title);
+        if(!author.isEmpty()){
+            if(general.length()>0)general.append(" ");
+            general.append(author);
+        }
+        if(general.length()>0){
+            docs=searchDocs("q="+enc(general.toString()));
+            if(docs.length()>0)return docs;
+        }
+
+        if(!author.isEmpty()){
+            docs=searchDocs("author="+enc(author));
+            if(docs.length()>0)return docs;
+        }
+
+        return new JSONArray();
     }
     static String first(JSONObject o,String k){JSONArray a=o.optJSONArray(k);return a!=null&&a.length()>0?a.optString(0,""):"";}
     static String description(JSONObject o){Object v=o.opt("description");return v instanceof JSONObject?((JSONObject)v).optString("value",""):v instanceof String?(String)v:"";}
