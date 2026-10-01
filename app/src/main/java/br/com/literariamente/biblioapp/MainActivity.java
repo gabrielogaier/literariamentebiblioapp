@@ -160,14 +160,44 @@ public class MainActivity extends Activity {
             if(!filtered.isEmpty())bs.setSelection(0);
         }));
 
-        List<JSONObject> ps=db.rows("SELECT * FROM people ORDER BY name COLLATE NOCASE");String[] names=new String[ps.size()+1];names[0]="Cadastrar nova pessoa";for(int i=0;i<ps.size();i++)names[i+1]=ps.get(i).optString("name")+" (#"+ps.get(i).optLong("id")+")";
-        text(body,"Quem ficará com o livro?",16);Spinner sp=new Spinner(this);sp.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,names));body.addView(sp,new LinearLayout.LayoutParams(-1,dp(64)));EditText name=input(body,"Nome da nova pessoa","");
+        List<JSONObject> ps=db.rows("SELECT * FROM people ORDER BY name COLLATE NOCASE");
+        EditText personFilter=input(body,"Filtrar pessoa por nome ou ID","");
+        text(body,"Quem ficará com o livro?",16);
+        Spinner sp=new Spinner(this);
+        ArrayList<JSONObject> filteredPeople=new ArrayList<>();
+        ArrayList<String> personLabels=new ArrayList<>();
+        personLabels.add("Cadastrar nova pessoa");
+        for(JSONObject p:ps){filteredPeople.add(p);personLabels.add(p.optString("name")+" (#"+p.optLong("id")+")");}
+        ArrayAdapter<String> personAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,personLabels);
+        sp.setAdapter(personAdapter);body.addView(sp,new LinearLayout.LayoutParams(-1,dp(64)));
+        TextView personCount=text(body,ps.size()+" pessoa(s) cadastrada(s)",14);
+        EditText name=input(body,"Nome da nova pessoa","");
         sp.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int position,long id){name.setVisibility(position==0?View.VISIBLE:View.GONE);}});
+
+        personFilter.addTextChangedListener(watcher(()->{
+            String term=personFilter.getText().toString().trim().toLowerCase(Locale.ROOT);
+            filteredPeople.clear();personLabels.clear();personLabels.add("Cadastrar nova pessoa");
+            for(JSONObject p:ps){
+                String personName=p.optString("name").toLowerCase(Locale.ROOT);
+                String id=String.valueOf(p.optLong("id"));
+                if(term.isEmpty()||personName.contains(term)||id.contains(term)){
+                    filteredPeople.add(p);personLabels.add(p.optString("name")+" (#"+p.optLong("id")+")");
+                }
+            }
+            personAdapter.notifyDataSetChanged();
+            personCount.setText(filteredPeople.size()+" pessoa(s) encontrada(s)");
+            sp.setSelection(0);
+        }));
+
         button(body,"Confirmar empréstimo",()->{
             if(filtered.isEmpty()){bookFilter.setError("Nenhum livro encontrado");return;}
             int bookPos=bs.getSelectedItemPosition();if(bookPos<0||bookPos>=filtered.size()){toast("Selecione um livro.");return;}
-            int pos=sp.getSelectedItemPosition();String n=name.getText().toString().trim();if(pos==0&&n.isEmpty()){name.setError("Informe o nome");return;}JSONObject b=filtered.get(bookPos);long person=pos==0?0:ps.get(pos-1).optLong("id");
-            String personName=pos==0?n:ps.get(pos-1).optString("name");
+            int pos=sp.getSelectedItemPosition();String n=name.getText().toString().trim();
+            if(pos==0&&n.isEmpty()){name.setError("Informe o nome");return;}
+            JSONObject b=filtered.get(bookPos);
+            JSONObject selectedPerson=pos==0?null:filteredPeople.get(pos-1);
+            long person=selectedPerson==null?0:selectedPerson.optLong("id");
+            String personName=selectedPerson==null?n:selectedPerson.optString("name");
             Runnable commit=()->safe(()->{db.lend(b.optLong("id"),person,n);home();toast("Empréstimo registrado.");});
             if(pos==0){List<JSONObject> matches=db.rows("SELECT * FROM people WHERE lower(name)=lower(?)",n);if(!matches.isEmpty()){
                 new AlertDialog.Builder(this).setTitle("Já existe uma pessoa com esse nome").setMessage("Usar o cadastro existente? Se forem pessoas diferentes, cancele e selecione ou cadastre um nome identificável.").setNegativeButton("Cancelar",null).setPositiveButton("Usar existente",(dlg,w)->confirm("Emprestar livro?",b.optString("title")+" para "+personName,()->safe(()->{db.lend(b.optLong("id"),matches.get(0).optLong("id"),"");home();}))).show();return;
@@ -177,8 +207,20 @@ public class MainActivity extends Activity {
 
     private void people(){
         layout("Pessoas","people");List<JSONObject> ps=db.rows("SELECT p.id,p.name,COUNT(l.id) AS total FROM people p LEFT JOIN loans l ON l.person_id=p.id AND l.returned_at IS NULL GROUP BY p.id ORDER BY p.name COLLATE NOCASE");
-        if(ps.isEmpty())text(body,"As pessoas são cadastradas durante o empréstimo.",17);
-        for(JSONObject p:ps){LinearLayout c=card(body);text(c,p.optString("name"),21);text(c,p.optInt("total")+" livro(s) no momento",16);button(c,"Ver livros e histórico",()->person(p.optLong("id")));}
+        if(ps.isEmpty()){text(body,"As pessoas são cadastradas durante o empréstimo.",17);return;}
+        EditText filter=input(body,"Buscar pessoa por nome ou ID","");
+        TextView count=text(body,ps.size()+" pessoa(s)",14);
+        LinearLayout list=new LinearLayout(this);list.setOrientation(1);body.addView(list);
+        Runnable render=()->{
+            list.removeAllViews();String term=filter.getText().toString().trim().toLowerCase(Locale.ROOT);int found=0;
+            for(JSONObject p:ps){
+                String personName=p.optString("name").toLowerCase(Locale.ROOT),id=String.valueOf(p.optLong("id"));
+                if(!term.isEmpty()&&!personName.contains(term)&&!id.contains(term))continue;
+                found++;LinearLayout c=card(list);text(c,p.optString("name"),21);text(c,p.optInt("total")+" livro(s) no momento",16);button(c,"Ver livros e histórico",()->person(p.optLong("id")));
+            }
+            count.setText(found==0?"Nenhuma pessoa encontrada":found+" pessoa(s) encontrada(s)");
+        };
+        filter.addTextChangedListener(watcher(render));render.run();
     }
     private void person(long id){
         List<JSONObject> found=db.rows("SELECT * FROM people WHERE id=?",""+id);if(found.isEmpty()){people();return;}selected=id;layout(found.get(0).optString("name"),"person");
@@ -187,7 +229,24 @@ public class MainActivity extends Activity {
         for(JSONObject l:active){LinearLayout c=card(body);text(c,l.optString("title"),21);text(c,l.optString("author"),16);button(c,"Devolver",()->confirm("Registrar devolução?",l.optString("title"),()->safe(()->{db.giveBack(l.optLong("id"));person(id);toast("Devolução registrada.");})));}
         text(body,"Histórico",21);showHistory(body,db.rows("SELECT l.*,b.title,p.name FROM loans l JOIN books b ON b.id=l.book_id JOIN people p ON p.id=l.person_id WHERE p.id=? ORDER BY l.borrowed_at DESC",""+id));
     }
-    private void history(){layout("Histórico","history");showHistory(body,db.rows("SELECT l.*,b.title,p.name FROM loans l JOIN books b ON b.id=l.book_id JOIN people p ON p.id=l.person_id ORDER BY l.borrowed_at DESC"));}
+    private void history(){
+        layout("Histórico","history");
+        List<JSONObject> loans=db.rows("SELECT l.*,b.title,p.name FROM loans l JOIN books b ON b.id=l.book_id JOIN people p ON p.id=l.person_id ORDER BY l.borrowed_at DESC");
+        if(loans.isEmpty()){showHistory(body,loans);return;}
+        EditText filter=input(body,"Buscar por livro ou pessoa","");
+        TextView count=text(body,loans.size()+" registro(s)",14);
+        LinearLayout list=new LinearLayout(this);list.setOrientation(1);body.addView(list);
+        Runnable render=()->{
+            list.removeAllViews();String term=filter.getText().toString().trim().toLowerCase(Locale.ROOT);ArrayList<JSONObject> filteredLoans=new ArrayList<>();
+            for(JSONObject l:loans){
+                String title=l.optString("title").toLowerCase(Locale.ROOT),person=l.optString("name").toLowerCase(Locale.ROOT);
+                if(term.isEmpty()||title.contains(term)||person.contains(term))filteredLoans.add(l);
+            }
+            count.setText(filteredLoans.isEmpty()?"Nenhum registro encontrado":filteredLoans.size()+" registro(s) encontrado(s)");
+            showHistory(list,filteredLoans);
+        };
+        filter.addTextChangedListener(watcher(render));render.run();
+    }
     private void showHistory(LinearLayout parent,List<JSONObject> loans){if(loans.isEmpty())text(parent,"Nenhum empréstimo registrado.",16);for(JSONObject l:loans){LinearLayout c=card(parent);text(c,l.optString("title"),19);text(c,"Pessoa: "+l.optString("name")+"\nEmpréstimo: "+date(l.optLong("borrowed_at"))+"\n"+(l.isNull("returned_at")?"Em andamento":"Devolução: "+date(l.optLong("returned_at"))),15);}}
     private void exportBackup(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");i.putExtra(Intent.EXTRA_TITLE,"literariamente-backup-"+new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+".json");safe(()->startActivityForResult(i,41));}
     private void importBackup(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("*/*");safe(()->startActivityForResult(i,42));}
