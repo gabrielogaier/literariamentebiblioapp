@@ -243,45 +243,59 @@ public class MainActivity extends Activity {
         bookFilter.addTextChangedListener(watcher(renderBooks));renderBooks.run();
 
         List<JSONObject> ps=db.rows("SELECT * FROM people ORDER BY name COLLATE NOCASE");
+        text(body,"Selecionar pessoa existente",16);
         EditText personFilter=input(body,"Filtrar pessoa por nome ou ID","");
-        text(body,"Quem ficará com os livros?",16);
-        Spinner sp=new Spinner(this);
-        ArrayList<JSONObject> filteredPeople=new ArrayList<>();
-        ArrayList<String> personLabels=new ArrayList<>();
-        personLabels.add("Cadastrar nova pessoa");
-        for(JSONObject p:ps){filteredPeople.add(p);personLabels.add(p.optString("name")+" (#"+p.optLong("id")+")");}
-        ArrayAdapter<String> personAdapter=new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,personLabels);
-        sp.setAdapter(personAdapter);body.addView(sp,new LinearLayout.LayoutParams(-1,dp(64)));
-        TextView personCount=text(body,ps.size()+" pessoa(s) cadastrada(s)",14);
-        EditText name=input(body,"Nome da nova pessoa","");
-        sp.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener(){public void onNothingSelected(android.widget.AdapterView<?> p){}public void onItemSelected(android.widget.AdapterView<?> p,View v,int position,long id){name.setVisibility(position==0?View.VISIBLE:View.GONE);}});
+        TextView selectedPersonLabel=text(body,"Nenhuma pessoa selecionada",14);
+        RadioGroup personResults=new RadioGroup(this);personResults.setOrientation(RadioGroup.VERTICAL);
+        body.addView(personResults,new LinearLayout.LayoutParams(-1,-2));
+        final long[] selectedPersonId={0};
+        final String[] selectedPersonName={""};
 
-        personFilter.addTextChangedListener(watcher(()->{
+        Runnable renderPeople=()->{
+            personResults.removeAllViews();
             String term=personFilter.getText().toString().trim().toLowerCase(Locale.ROOT);
-            filteredPeople.clear();personLabels.clear();personLabels.add("Cadastrar nova pessoa");
+            int shown=0;
             for(JSONObject p:ps){
-                String personName=p.optString("name").toLowerCase(Locale.ROOT);
+                String personName=p.optString("name");
                 String id=String.valueOf(p.optLong("id"));
-                if(term.isEmpty()||personName.contains(term)||id.contains(term)){
-                    filteredPeople.add(p);personLabels.add(p.optString("name")+" (#"+p.optLong("id")+")");
-                }
+                if(!term.isEmpty()&&!personName.toLowerCase(Locale.ROOT).contains(term)&&!id.contains(term))continue;
+                shown++;
+                RadioButton option=new RadioButton(this);
+                long personId=p.optLong("id");
+                option.setText(personName+" (#"+personId+")");
+                option.setTextSize(16);option.setMinHeight(dp(48));
+                option.setChecked(selectedPersonId[0]==personId);
+                option.setOnClickListener(v->{
+                    selectedPersonId[0]=personId;
+                    selectedPersonName[0]=personName;
+                    selectedPersonLabel.setText("Selecionado: "+personName);
+                });
+                personResults.addView(option,new RadioGroup.LayoutParams(-1,-2));
             }
-            personAdapter.notifyDataSetChanged();
-            personCount.setText(filteredPeople.size()+" pessoa(s) encontrada(s)");
-            sp.setSelection(0);
-        }));
+            if(shown==0)text(personResults,"Nenhuma pessoa encontrada.",14);
+        };
+        personFilter.addTextChangedListener(watcher(renderPeople));renderPeople.run();
+
+        text(body,"Ou cadastrar nova pessoa",16);
+        EditText name=input(body,"Nome da nova pessoa","");
+        name.setOnFocusChangeListener((v,hasFocus)->{
+            if(hasFocus&&selectedPersonId[0]>0){
+                selectedPersonId[0]=0;selectedPersonName[0]="";
+                personResults.clearCheck();
+                selectedPersonLabel.setText("Nenhuma pessoa selecionada");
+            }
+        });
 
         button(body,"Confirmar empréstimo",()->{
             if(selectedBooks.isEmpty()){toast("Selecione ao menos um livro.");return;}
-            int pos=sp.getSelectedItemPosition();String n=name.getText().toString().trim();
-            if(pos==0&&n.isEmpty()){name.setError("Informe o nome");return;}
-            JSONObject selectedPerson=pos==0?null:filteredPeople.get(pos-1);
-            long person=selectedPerson==null?0:selectedPerson.optLong("id");
-            String personName=selectedPerson==null?n:selectedPerson.optString("name");
+            String n=name.getText().toString().trim();
+            long person=selectedPersonId[0];
+            String personName=person>0?selectedPersonName[0]:n;
+            if(person==0&&n.isEmpty()){name.setError("Selecione uma pessoa ou informe um novo nome");return;}
             ArrayList<Long> booksToLend=new ArrayList<>(selectedBooks);
             String message=booksToLend.size()+" livro(s) para "+personName;
             Runnable commit=()->safe(()->{db.lendMany(booksToLend,person,n);home();toast(booksToLend.size()+" empréstimo(s) registrado(s).");});
-            if(pos==0){
+            if(person==0){
                 List<JSONObject> matches=db.rows("SELECT * FROM people WHERE lower(name)=lower(?)",n);
                 if(!matches.isEmpty()){
                     long existingPerson=matches.get(0).optLong("id");
