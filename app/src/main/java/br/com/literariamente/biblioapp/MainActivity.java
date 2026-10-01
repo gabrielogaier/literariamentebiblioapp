@@ -21,11 +21,12 @@ public class MainActivity extends Activity {
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final Map<String,EditText> fields=new LinkedHashMap<>();
     private RatingBar ratingBar;
+    private String pendingCover="";
     private String page="home";
     private long selected=0,editing=0;
     private JSONObject initial=new JSONObject();
     private int generation=0;
-    private final int green=Color.rgb(35,100,91),ink=Color.rgb(34,48,44),paper=Color.rgb(245,242,235);
+    private final int wine=Color.rgb(142,47,60),wineDark=Color.rgb(102,35,45),gold=Color.rgb(211,151,45),ink=Color.rgb(66,45,43),paper=Color.rgb(250,244,235),cardPaper=Color.rgb(255,251,246),blush=Color.rgb(248,229,224),line=Color.rgb(229,208,199),green=Color.rgb(73,126,84);
     private static final String[] BOOK_FIELDS={"title","author","year"};
     private static final String[] LABELS={"Título *","Autor *","Ano de lançamento"};
     @Override public void onCreate(Bundle state){
@@ -45,19 +46,21 @@ public class MainActivity extends Activity {
         root.setOnApplyWindowInsetsListener((v,in)->{v.setPadding(in.getSystemWindowInsetLeft(),in.getSystemWindowInsetTop(),in.getSystemWindowInsetRight(),in.getSystemWindowInsetBottom());return in;});
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
         setContentView(root);root.requestApplyInsets();
-        LinearLayout header=new LinearLayout(this);header.setPadding(dp(16),dp(12),dp(16),dp(4));header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
+        LinearLayout header=new LinearLayout(this);header.setPadding(dp(18),dp(14),dp(18),dp(8));header.setGravity(Gravity.CENTER_VERTICAL);root.addView(header);
         if(!current.equals("home")&&!current.equals("books")&&!current.equals("lend"))button(header,"‹",this::onBackPressed);
-        TextView heading=text(header,title,24);heading.setTypeface(null,Typeface.BOLD);
+        TextView heading=text(header,title,current.equals("home")?30:26);heading.setTextColor(wineDark);heading.setTypeface(Typeface.SERIF,Typeface.BOLD);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         body=new LinearLayout(this);body.setOrientation(1);body.setPadding(dp(20),dp(12),dp(20),dp(24));scroll.addView(body);
-        LinearLayout nav=new LinearLayout(this);nav.setPadding(dp(8),dp(6),dp(8),dp(6));root.addView(nav);
-        navButton(nav,"Início",()->home());navButton(nav,"Livros",()->books());navButton(nav,"Emprestar",()->lend(0));
+        LinearLayout nav=new LinearLayout(this);nav.setPadding(dp(8),dp(6),dp(8),dp(8));nav.setBackgroundColor(cardPaper);root.addView(nav);
+        navButton(nav,"⌂\nInício",()->home());navButton(nav,"▤\nLivros",()->books());navButton(nav,"⇄\nEmprestar",()->lend(0));
     }
-    private void navButton(LinearLayout parent,String title,Runnable action){Button b=button(parent,title,()->leave(action));b.setLayoutParams(new LinearLayout.LayoutParams(0,dp(54),1));}
+    private void navButton(LinearLayout parent,String title,Runnable action){Button b=button(parent,title,()->leave(action));b.setTextSize(13);b.setBackgroundColor(Color.TRANSPARENT);b.setLayoutParams(new LinearLayout.LayoutParams(0,dp(58),1));}
     private TextView text(LinearLayout parent,String value,int size){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(ink);t.setPadding(0,dp(5),0,dp(7));parent.addView(t);return t;}
-    private Button button(LinearLayout parent,String value,Runnable action){Button b=new Button(this);b.setText(value);b.setAllCaps(false);b.setTextSize(16);b.setTextColor(green);b.setMinHeight(dp(50));parent.addView(b);b.setOnClickListener(v->action.run());return b;}
-    private LinearLayout card(LinearLayout parent){LinearLayout c=new LinearLayout(this);c.setOrientation(1);c.setPadding(dp(16),dp(12),dp(16),dp(12));GradientDrawable bg=new GradientDrawable();bg.setColor(Color.WHITE);bg.setCornerRadius(dp(14));c.setBackground(bg);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(6),0,dp(10));parent.addView(c,lp);return c;}
-    private EditText input(LinearLayout parent,String label,String value){text(parent,label,14);EditText e=new EditText(this);e.setText(value);e.setTextSize(18);e.setSingleLine(true);e.setMinHeight(dp(52));parent.addView(e,new LinearLayout.LayoutParams(-1,-2));return e;}
+    private GradientDrawable rounded(int color,int radius){GradientDrawable bg=new GradientDrawable();bg.setColor(color);bg.setCornerRadius(dp(radius));return bg;}
+    private Button button(LinearLayout parent,String value,Runnable action){Button b=new Button(this);b.setText(value);b.setAllCaps(false);b.setTextSize(16);b.setTextColor(wineDark);GradientDrawable bg=rounded(blush,14);bg.setStroke(dp(1),line);b.setBackground(bg);b.setMinHeight(dp(52));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(5),0,dp(7));parent.addView(b,lp);b.setOnClickListener(v->action.run());return b;}
+    private Button primaryButton(LinearLayout parent,String value,Runnable action){Button b=button(parent,value,action);b.setTextColor(Color.WHITE);b.setTypeface(null,Typeface.BOLD);b.setBackground(rounded(wine,14));return b;}
+    private LinearLayout card(LinearLayout parent){LinearLayout c=new LinearLayout(this);c.setOrientation(1);c.setPadding(dp(16),dp(14),dp(16),dp(14));GradientDrawable bg=rounded(cardPaper,16);bg.setStroke(dp(1),line);c.setBackground(bg);c.setElevation(dp(2));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(6),0,dp(10));parent.addView(c,lp);return c;}
+    private EditText input(LinearLayout parent,String label,String value){TextView l=text(parent,label,14);l.setTypeface(null,Typeface.BOLD);EditText e=new EditText(this);e.setText(value);e.setTextSize(17);e.setSingleLine(true);e.setTextColor(ink);e.setHintTextColor(Color.rgb(158,137,131));e.setPadding(dp(14),0,dp(14),0);GradientDrawable bg=rounded(cardPaper,13);bg.setStroke(dp(1),line);e.setBackground(bg);e.setMinHeight(dp(54));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(54));lp.setMargins(0,0,0,dp(10));parent.addView(e,lp);return e;}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
     private void confirm(String title,String message,Runnable action){new AlertDialog.Builder(this).setTitle(title).setMessage(message).setNegativeButton("Cancelar",null).setPositiveButton("Confirmar",(d,w)->action.run()).show();}
     private void safe(Runnable action){try{action.run();}catch(Exception e){toast("Não foi possível concluir. "+(e.getMessage()==null?"Tente novamente.":e.getMessage()));}}
@@ -66,15 +69,32 @@ public class MainActivity extends Activity {
     @Override public void onBackPressed(){leave(()->{if(page.equals("edit")&&editing>0)book(editing);else if(page.equals("book")||page.equals("edit"))books();else if(page.equals("person"))people();else if(!page.equals("home"))home();else super.onBackPressed();});}
     private String date(long time){return DateFormat.getDateTimeInstance(DateFormat.SHORT,DateFormat.SHORT,new Locale("pt","BR")).format(new Date(time));}
     private void home(){
-        layout("Literariamente","home");text(body,"Sua biblioteca, sempre por perto.",16);
+        layout("Literariamente","home");
+        TextView sub=text(body,"Sua biblioteca pessoal",16);sub.setTextColor(wine);sub.setTypeface(Typeface.SERIF,Typeface.ITALIC);
+        text(body,"“Boas histórias também vivem aqui.”",17).setTypeface(Typeface.SERIF,Typeface.ITALIC);
         int total=db.count("SELECT COUNT(*) FROM books"),out=db.count("SELECT COUNT(*) FROM loans WHERE returned_at IS NULL");
-        LinearLayout stats=card(body);text(stats,"Livros: "+total+"\nEmprestados: "+out+"\nDisponíveis: "+(total-out),22);
-        button(body,"Cadastrar livro",()->edit(0,null));text(body,"Com quem estão",21);
+        int holders=db.count("SELECT COUNT(DISTINCT person_id) FROM loans WHERE returned_at IS NULL");
+        LinearLayout stats=new LinearLayout(this);stats.setOrientation(LinearLayout.HORIZONTAL);body.addView(stats,new LinearLayout.LayoutParams(-1,-2));
+        stat(stats,"▤",String.valueOf(total),"livros");stat(stats,"⇄",String.valueOf(out),"emprestados");stat(stats,"●",String.valueOf(holders),"pessoas com livros");
+        text(body,"Sua estante",21).setTypeface(Typeface.SERIF,Typeface.BOLD);
+        primaryButton(body,"＋ Adicionar livro",()->edit(0,null));
+        button(body,"▤  Meus livros",this::books);
+        button(body,"⇄  Empréstimos",()->lend(0));
+        button(body,"●  Pessoas",this::people);
+        button(body,"◷  Histórico",this::history);
         List<JSONObject> people=db.rows("SELECT p.id,p.name,COUNT(*) AS total FROM people p JOIN loans l ON l.person_id=p.id WHERE l.returned_at IS NULL GROUP BY p.id ORDER BY p.name COLLATE NOCASE");
-        if(people.isEmpty())text(body,"Nenhum livro emprestado no momento.",16);
-        for(JSONObject p:people){LinearLayout c=card(body);text(c,p.optString("name"),20);text(c,p.optInt("total")+" livro(s)",16);button(c,"Ver livros",()->person(p.optLong("id")));}
-        button(body,"Pessoas",this::people);button(body,"Histórico de empréstimos",this::history);
-        LinearLayout backup=card(body);text(backup,"Proteja sua biblioteca",19);text(backup,"Salve uma cópia antes de trocar ou formatar o celular.",15);button(backup,"Exportar backup",this::exportBackup);button(backup,"Restaurar backup",this::importBackup);
+        if(!people.isEmpty()){
+            text(body,"Com quem estão",21).setTypeface(Typeface.SERIF,Typeface.BOLD);
+            for(JSONObject p:people){LinearLayout c=card(body);TextView n=text(c,p.optString("name"),19);n.setTypeface(Typeface.SERIF,Typeface.BOLD);text(c,p.optInt("total")+" livro(s)",15);button(c,"Ver livros",()->person(p.optLong("id")));}
+        }
+        LinearLayout backup=card(body);text(backup,"Proteja sua biblioteca",18).setTypeface(Typeface.SERIF,Typeface.BOLD);text(backup,"Salve uma cópia antes de trocar ou formatar o celular.",14);button(backup,"Exportar backup",this::exportBackup);button(backup,"Restaurar backup",this::importBackup);
+    }
+    private void stat(LinearLayout parent,String icon,String value,String label){
+        LinearLayout c=new LinearLayout(this);c.setOrientation(1);c.setGravity(Gravity.CENTER);c.setPadding(dp(6),dp(10),dp(6),dp(10));GradientDrawable bg=rounded(cardPaper,15);bg.setStroke(dp(1),line);c.setBackground(bg);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(104),1);lp.setMargins(dp(3),dp(4),dp(3),dp(10));parent.addView(c,lp);
+        TextView i=text(c,icon,20);i.setTextColor(wine);i.setGravity(Gravity.CENTER);
+        TextView v=text(c,value,21);v.setTypeface(Typeface.SERIF,Typeface.BOLD);v.setGravity(Gravity.CENTER);
+        TextView l=text(c,label,11);l.setGravity(Gravity.CENTER);
     }
     private String stars(int rating){if(rating<=0)return "Sem avaliação";StringBuilder s=new StringBuilder();for(int i=1;i<=5;i++)s.append(i<=rating?"★":"☆");return s.toString();}
     private void books(){
@@ -103,11 +123,15 @@ public class MainActivity extends Activity {
             if(mode==1)Collections.sort(shown,(a,b)->Integer.compare(b.optInt("rating",0),a.optInt("rating",0)));
             if(shown.isEmpty()){text(list,"Nenhum livro encontrado.",16);return;}
             for(JSONObject b:shown){
-                LinearLayout c=card(list);text(c,b.optString("title"),20);text(c,b.optString("author"),16);
-                String year=b.optString("year");if(!year.isEmpty())text(c,year,14);
-                text(c,stars(b.optInt("rating",0)),18);
-                text(c,b.isNull("holder")?"Disponível":"Com "+b.optString("holder"),15);
-                button(c,"Abrir",()->book(b.optLong("id")));
+                LinearLayout c=card(list);c.setOrientation(LinearLayout.HORIZONTAL);
+                coverThumb(c,b.optString("cover",""));
+                LinearLayout info=new LinearLayout(this);info.setOrientation(LinearLayout.VERTICAL);c.addView(info,new LinearLayout.LayoutParams(0,-2,1));
+                TextView title=text(info,b.optString("title"),19);title.setTypeface(Typeface.SERIF,Typeface.BOLD);
+                text(info,b.optString("author"),15);
+                String year=b.optString("year");if(!year.isEmpty())text(info,year,13);
+                TextView starText=text(info,stars(b.optInt("rating",0)),18);starText.setTextColor(gold);
+                TextView status=text(info,b.isNull("holder")?"Disponível":"Com "+b.optString("holder"),14);status.setTextColor(b.isNull("holder")?green:wine);
+                button(info,"Abrir",()->book(b.optLong("id")));
             }
         };
         q.addTextChangedListener(watcher(render));
@@ -115,10 +139,11 @@ public class MainActivity extends Activity {
         render.run();
     }
     private TextWatcher watcher(Runnable action){return new TextWatcher(){public void beforeTextChanged(CharSequence s,int start,int count,int after){}public void onTextChanged(CharSequence s,int start,int before,int count){action.run();}public void afterTextChanged(Editable e){}};}
-    private void cover(LinearLayout parent,String encoded){if(encoded.isEmpty())return;try{byte[] bytes=Base64.decode(encoded,Base64.DEFAULT);BitmapFactory.Options opt=new BitmapFactory.Options();opt.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,opt);opt.inSampleSize=Math.max(1,Math.max(opt.outWidth,opt.outHeight)/600);opt.inJustDecodeBounds=false;Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,opt);if(bitmap!=null){ImageView image=new ImageView(this);image.setImageBitmap(bitmap);image.setContentDescription("Capa do livro");image.setAdjustViewBounds(true);image.setScaleType(ImageView.ScaleType.FIT_CENTER);parent.addView(image,new LinearLayout.LayoutParams(-1,dp(200)));}}catch(Exception ignored){}}
+    private void cover(LinearLayout parent,String encoded){if(encoded.isEmpty())return;try{byte[] bytes=Base64.decode(encoded,Base64.DEFAULT);BitmapFactory.Options opt=new BitmapFactory.Options();opt.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(bytes,0,bytes.length,opt);opt.inSampleSize=Math.max(1,Math.max(opt.outWidth,opt.outHeight)/600);opt.inJustDecodeBounds=false;Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,opt);if(bitmap!=null){ImageView image=new ImageView(this);image.setImageBitmap(bitmap);image.setContentDescription("Capa do livro");image.setAdjustViewBounds(true);image.setScaleType(ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(210));lp.setMargins(0,0,0,dp(12));parent.addView(image,lp);}}catch(Exception ignored){}}
+    private void coverThumb(LinearLayout parent,String encoded){LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(dp(72),dp(108));lp.setMargins(0,0,dp(14),0);if(encoded==null||encoded.isEmpty()){TextView p=new TextView(this);p.setText("▤");p.setTextSize(28);p.setTextColor(wine);p.setGravity(Gravity.CENTER);p.setBackground(rounded(blush,10));parent.addView(p,lp);return;}try{byte[] bytes=Base64.decode(encoded,Base64.DEFAULT);Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length);if(bitmap!=null){ImageView image=new ImageView(this);image.setImageBitmap(bitmap);image.setContentDescription("Capa do livro");image.setScaleType(ImageView.ScaleType.CENTER_CROP);image.setBackground(rounded(blush,10));parent.addView(image,lp);return;}}catch(Exception ignored){}TextView p=new TextView(this);p.setText("▤");p.setTextSize(28);p.setTextColor(wine);p.setGravity(Gravity.CENTER);p.setBackground(rounded(blush,10));parent.addView(p,lp);}
     private void book(long id){
         List<JSONObject> found=db.rows("SELECT * FROM books WHERE id=?",""+id);if(found.isEmpty()){books();return;}JSONObject b=found.get(0);selected=id;
-        layout("Detalhes do livro","book");text(body,b.optString("title"),25);text(body,b.optString("author"),19);
+        layout("Detalhes do livro","book");cover(body,b.optString("cover",""));TextView bookTitle=text(body,b.optString("title"),25);bookTitle.setTypeface(Typeface.SERIF,Typeface.BOLD);text(body,b.optString("author"),19);
         if(!b.optString("year").isEmpty())text(body,"Ano: "+b.optString("year"),16);
         text(body,stars(b.optInt("rating",0)),22);
         List<JSONObject> active=db.rows("SELECT l.id,p.name FROM loans l JOIN people p ON p.id=l.person_id WHERE l.book_id=? AND l.returned_at IS NULL",""+id);
@@ -132,13 +157,16 @@ public class MainActivity extends Activity {
         try{
             for(String f:BOOK_FIELDS)o.put(f,fields.containsKey(f)?fields.get(f).getText().toString().trim():"");
             o.put("rating",ratingBar==null?0:Math.round(ratingBar.getRating()));
+            o.put("cover",pendingCover==null?"":pendingCover);
         }catch(Exception ignored){}
         return o;
     }
     private void edit(long id,JSONObject provided){
         JSONObject b=provided;if(b==null&&id>0){List<JSONObject> found=db.rows("SELECT * FROM books WHERE id=?",""+id);if(!found.isEmpty())b=found.get(0);}if(b==null)b=new JSONObject();
-        editing=id;layout(id==0?"Cadastrar livro":"Editar livro","edit");
-        text(body,"Título e autor são obrigatórios. A avaliação é sua e pode ser alterada depois.",16);
+        editing=id;layout(id==0?"Adicionar livro":"Editar livro","edit");
+        pendingCover=b.optString("cover","");
+        if(!pendingCover.isEmpty()){text(body,"Capa",14).setTypeface(null,Typeface.BOLD);cover(body,pendingCover);}
+        text(body,"Título e autor são obrigatórios. A avaliação é sua e pode ser alterada depois.",15);
         for(int i=0;i<BOOK_FIELDS.length;i++){
             EditText e=input(body,LABELS[i],b.optString(BOOK_FIELDS[i],""));fields.put(BOOK_FIELDS[i],e);
             if(BOOK_FIELDS[i].equals("year"))e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
@@ -149,8 +177,8 @@ public class MainActivity extends Activity {
         body.addView(ratingBar,new LinearLayout.LayoutParams(-2,-2));
         button(body,"Limpar avaliação",()->ratingBar.setRating(0));
         initial=b.optJSONObject("_initial")==null?draft():b.optJSONObject("_initial");
-        button(body,"Buscar informações online",this::search);
-        button(body,"Salvar livro",()->{
+        button(body,"⌕  Buscar informações online",this::search);
+        primaryButton(body,"Salvar livro",()->{
             if(fields.get("title").getText().toString().trim().isEmpty()){fields.get("title").setError("Informe o título");return;}
             if(fields.get("author").getText().toString().trim().isEmpty()){fields.get("author").setError("Informe o autor");return;}
             safe(()->{long saved=db.saveBook(id,draft());book(saved);toast("Livro salvo.");});
@@ -182,9 +210,10 @@ public class MainActivity extends Activity {
         ProgressDialog progress=ProgressDialog.show(this,"Carregando informações","Buscando título, autor e ano...",true,true);
         worker.execute(()->{try{JSONObject info=BookSearch.details(result);runOnUiThread(()->{
             if(isFinishing()||isDestroyed())return;boolean canceled=!progress.isShowing();progress.dismiss();if(canceled||generation!=token)return;
-            confirm("Usar estas informações?","Título, autor e ano encontrados serão preenchidos. Sua avaliação não será alterada.",()->{
+            confirm("Usar estas informações?","Título, autor, ano e capa disponível serão preenchidos. Sua avaliação não será alterada.",()->{
                 for(String f:BOOK_FIELDS)if(!info.optString(f).isEmpty())fields.get(f).setText(info.optString(f));
-                toast("Informações preenchidas. Revise e toque em Salvar.");
+                if(!info.optString("cover","").isEmpty())pendingCover=info.optString("cover");
+                toast(info.optString("cover","").isEmpty()?"Informações preenchidas.":"Informações e capa preenchidas.");
             });
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível carregar os detalhes. Continue manualmente.");});}});
     }
@@ -297,7 +326,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        button(body,"Confirmar empréstimo",()->{
+        primaryButton(body,"Confirmar empréstimo",()->{
             if(selectedBooks.isEmpty()){toast("Selecione ao menos um livro.");return;}
             String n=name.getText().toString().trim();
             long person=selectedPersonId[0];

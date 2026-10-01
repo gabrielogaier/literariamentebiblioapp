@@ -24,7 +24,7 @@ public final class BookSearch {
     static JSONObject json(String url)throws Exception{return new JSONObject(new String(fetch(url,5*1024*1024),"UTF-8"));}
     static String enc(String s)throws Exception{return URLEncoder.encode(s,"UTF-8");}
     static JSONArray searchDocs(String query)throws Exception{
-        String fields="key,title,author_name,first_publish_year,editions,editions.title,editions.language,editions.publish_date";
+        String fields="key,title,author_name,first_publish_year,cover_i,editions,editions.title,editions.language,editions.publish_date";
         JSONObject result=json("https://openlibrary.org/search.json?"+query+"&lang=pt&limit=15&fields="+enc(fields));
         JSONArray docs=result.optJSONArray("docs");
         return docs==null?new JSONArray():docs;
@@ -104,6 +104,13 @@ public final class BookSearch {
         if(names!=null)for(int i=0;i<names.length();i++)authors+=(i==0?"":", ")+names.optString(i);
         out.put("author",authors);
         out.put("year",resultYear(doc));
+        int coverId=doc.optInt("cover_i",0);
+        if(coverId>0){
+            try{
+                byte[] image=fetch("https://covers.openlibrary.org/b/id/"+coverId+"-M.jpg",2*1024*1024);
+                out.put("cover",android.util.Base64.encodeToString(image,android.util.Base64.NO_WRAP));
+            }catch(Exception ignored){}
+        }
         return out;
     }
 }

@@ -42,6 +42,7 @@ public final class Db extends SQLiteOpenHelper {
         v.put("title",book.optString("title","").trim());
         v.put("author",book.optString("author","").trim());
         v.put("year",book.optString("year","").trim());
+        v.put("cover",book.optString("cover",""));
         int rating=book.optInt("rating",0);if(rating<0||rating>5)rating=0;v.put("rating",rating);
         if(v.getAsString("title").isEmpty()||v.getAsString("author").isEmpty())throw new IllegalArgumentException("Informe título e autor.");
         if(id==0)return getWritableDatabase().insertOrThrow("books",null,v);
