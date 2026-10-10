@@ -41,5 +41,5 @@ class Loans(unittest.TestCase):
         with self.assertRaises(sqlite3.IntegrityError):self.db.execute('INSERT INTO loans(book_id,person_id,borrowed_at) VALUES(1,999,100)')
         with self.assertRaises(sqlite3.IntegrityError):self.db.execute('INSERT INTO loans(book_id,person_id,borrowed_at,returned_at) VALUES(1,1,100,50)')
 if __name__=='__main__':
-    if len(SQL)!=5:raise RuntimeError('Expected five schema statements')
+    if len(SQL)!=6:raise RuntimeError('Expected six schema statements')
     unittest.main(verbosity=2)
