@@ -5,7 +5,7 @@ Aplicativo Android nativo para biblioteca pessoal, com foco em saber quem está 
 ## O que está implementado
 
 - Dashboard com total, emprestados, disponíveis e pessoas com livros.
-- Cadastro e edição com apenas título e autor obrigatórios.
+- Cadastro e edição na ordem autor, ilustrador, título, editora e ano de publicação; somente autor e título obrigatórios.
 - Busca local por título, autor e ISBN.
 - Empréstimo para pessoa existente ou pessoa cadastrada na hora.
 - Devolução individual, sem apagar o histórico.
@@ -13,6 +13,7 @@ Aplicativo Android nativo para biblioteca pessoal, com foco em saber quem está 
 - Histórico geral e por livro.
 - Consulta opcional por título, autor ou ISBN à Open Library.
 - Seleção de resultado e preenchimento dos campos encontrados.
+- Capa sugerida pela Open Library, fotografia pela câmera ou imagem escolhida na galeria, com substituição manual em qualquer momento.
 - Capa armazenada no próprio banco, disponível offline e incluída no backup.
 - Exportação e restauração de backup JSON pelo seletor de arquivos do Android.
 - Confirmação antes de substituir a biblioteca e restauração em transação.
@@ -74,7 +75,7 @@ Para restaurar, escolha **Restaurar backup**, selecione o JSON e confirme. A res
 
 A consulta só ocorre quando solicitada. Não envia pessoas nem histórico. Título, autor ou ISBN digitados são enviados à Open Library por HTTPS. Não usa login ou chave de API.
 
-A busca retorna até 15 resultados. Os detalhes vêm de uma edição do resultado selecionado; confira ISBN, editora e ano porque pode ser outra edição ou idioma. Alguns dados podem faltar. A descrição pode vir da obra. Se a capa ou a descrição falharem, as demais informações ainda podem ser utilizadas. Um erro na consulta nunca impede o cadastro manual.
+A busca retorna até 15 resultados. Ao selecionar um resultado, a editora e a capa também podem ser preenchidas quando disponíveis. A capa escolhida manualmente não é substituída pela API. O ilustrador pode ser informado manualmente. Os detalhes vêm de uma edição do resultado selecionado; confira ISBN, editora e ano porque pode ser outra edição ou idioma. Alguns dados podem faltar. A descrição pode vir da obra. Se a capa ou a descrição falharem, as demais informações ainda podem ser utilizadas. Um erro na consulta nunca impede o cadastro manual.
 
 Documentação: https://openlibrary.org/dev/docs/api/search e https://openlibrary.org/developers/api
 
