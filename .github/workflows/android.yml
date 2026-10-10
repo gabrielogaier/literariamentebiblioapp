@@ -2,6 +2,9 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -26,6 +29,9 @@ jobs:
 
       - name: Permitir execução do Gradle
         run: chmod +x gradlew
+
+      - name: Testar estrutura do banco
+        run: python3 validacao/test_schema.py
 
       - name: Preparar assinatura
         env:
@@ -65,4 +71,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="v1.0.${GITHUB_RUN_NUMBER}"
-          gh release create "$VERSION"             app/build/outputs/apk/release/Literariamente-Biblio.apk             --repo "${GITHUB_REPOSITORY}"             --target "${GITHUB_SHA}"             --title "Literariamente $VERSION"             --notes "Nova versão do Literariamente com biblioteca pessoal, avaliações, empréstimos, histórico, backup local, foto do próprio exemplar e lista de desejos."
+          gh release create "$VERSION"             app/build/outputs/apk/release/Literariamente-Biblio.apk             --repo "${GITHUB_REPOSITORY}"             --target "${GITHUB_SHA}"             --title "Literariamente $VERSION"             --notes "Cadastro bibliográfico com autor, ilustrador, título, editora e ano de publicação; capas da Open Library, câmera ou galeria. Preserva biblioteca e backups existentes."
