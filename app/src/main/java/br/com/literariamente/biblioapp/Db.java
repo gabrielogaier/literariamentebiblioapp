@@ -8,12 +8,12 @@ import java.util.*;
 
 /** Single local database. Returned loans are never removed during normal use. */
 public final class Db extends SQLiteOpenHelper {
-    static final String[] LEGACY_BOOK_FIELDS={"title","author","subtitle","publisher","year","isbn","pages","description","language","cover"};
+    static final String[] LEGACY_BOOK_FIELDS={"title","author","illustrator","subtitle","publisher","year","isbn","pages","description","language","cover"};
     public Db(Context c){this(c,"library.db");}
-    Db(Context c,String filename){super(c,filename,null,3);}
+    Db(Context c,String filename){super(c,filename,null,4);}
     @Override public void onConfigure(SQLiteDatabase d){d.setForeignKeyConstraintsEnabled(true);}
     @Override public void onCreate(SQLiteDatabase d){
-        d.execSQL("CREATE TABLE books(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL CHECK(length(trim(title))>0),author TEXT NOT NULL CHECK(length(trim(author))>0),subtitle TEXT NOT NULL DEFAULT '',publisher TEXT NOT NULL DEFAULT '',year TEXT NOT NULL DEFAULT '',isbn TEXT NOT NULL DEFAULT '',pages TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',language TEXT NOT NULL DEFAULT '',cover TEXT NOT NULL DEFAULT '',rating INTEGER NOT NULL DEFAULT 0 CHECK(rating BETWEEN 0 AND 5))");
+        d.execSQL("CREATE TABLE books(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL CHECK(length(trim(title))>0),author TEXT NOT NULL CHECK(length(trim(author))>0),illustrator TEXT NOT NULL DEFAULT '',subtitle TEXT NOT NULL DEFAULT '',publisher TEXT NOT NULL DEFAULT '',year TEXT NOT NULL DEFAULT '',isbn TEXT NOT NULL DEFAULT '',pages TEXT NOT NULL DEFAULT '',description TEXT NOT NULL DEFAULT '',language TEXT NOT NULL DEFAULT '',cover TEXT NOT NULL DEFAULT '',rating INTEGER NOT NULL DEFAULT 0 CHECK(rating BETWEEN 0 AND 5))");
         d.execSQL("CREATE TABLE people(id INTEGER PRIMARY KEY AUTOINCREMENT,name TEXT NOT NULL CHECK(length(trim(name))>0))");
         d.execSQL("CREATE TABLE loans(id INTEGER PRIMARY KEY AUTOINCREMENT,book_id INTEGER NOT NULL REFERENCES books(id),person_id INTEGER NOT NULL REFERENCES people(id),borrowed_at INTEGER NOT NULL CHECK(borrowed_at>0),returned_at INTEGER CHECK(returned_at IS NULL OR returned_at>=borrowed_at))");
         d.execSQL("CREATE UNIQUE INDEX one_active_loan ON loans(book_id) WHERE returned_at IS NULL");
@@ -23,6 +23,7 @@ public final class Db extends SQLiteOpenHelper {
     @Override public void onUpgrade(SQLiteDatabase d,int old,int next){
         if(old<2)d.execSQL("ALTER TABLE books ADD COLUMN rating INTEGER NOT NULL DEFAULT 0 CHECK(rating BETWEEN 0 AND 5)");
         if(old<3)d.execSQL("CREATE TABLE wishlist(id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL CHECK(length(trim(title))>0),author TEXT NOT NULL CHECK(length(trim(author))>0))");
+        if(old<4)d.execSQL("ALTER TABLE books ADD COLUMN illustrator TEXT NOT NULL DEFAULT ''");
     }
     public List<JSONObject> rows(String sql,String... args){
         List<JSONObject> result=new ArrayList<>();
@@ -43,6 +44,8 @@ public final class Db extends SQLiteOpenHelper {
         ContentValues v=new ContentValues();
         v.put("title",book.optString("title","").trim());
         v.put("author",book.optString("author","").trim());
+        v.put("illustrator",book.optString("illustrator","").trim());
+        v.put("publisher",book.optString("publisher","").trim());
         v.put("year",book.optString("year","").trim());
         v.put("cover",book.optString("cover",""));
         int rating=book.optInt("rating",0);if(rating<0||rating>5)rating=0;v.put("rating",rating);
@@ -86,14 +89,14 @@ public final class Db extends SQLiteOpenHelper {
     }
     public JSONObject backup() throws JSONException {
         SQLiteDatabase d=getWritableDatabase();d.beginTransaction();try{
-        JSONObject root=new JSONObject();root.put("format","literariamente-biblioapp");root.put("version",3);root.put("createdAt",System.currentTimeMillis());
+        JSONObject root=new JSONObject();root.put("format","literariamente-biblioapp");root.put("version",4);root.put("createdAt",System.currentTimeMillis());
         for(String t:new String[]{"books","people","loans","wishlist"})root.put(t,new JSONArray(rows("SELECT * FROM "+t+" ORDER BY id")));d.setTransactionSuccessful();return root;
         }finally{d.endTransaction();}
     }
     /** Validate before deleting; the SQLite transaction rolls back every change on error. */
     public void restore(JSONObject root) throws JSONException {
         int backupVersion=root.optInt("version");
-        if(!"literariamente-biblioapp".equals(root.optString("format"))||(backupVersion<1||backupVersion>3))throw new IllegalArgumentException("Formato de backup não reconhecido.");
+        if(!"literariamente-biblioapp".equals(root.optString("format"))||(backupVersion<1||backupVersion>4))throw new IllegalArgumentException("Formato de backup não reconhecido.");
         JSONArray books=root.getJSONArray("books"),people=root.getJSONArray("people"),loans=root.getJSONArray("loans");
         JSONArray wishlist=backupVersion>=3?root.optJSONArray("wishlist"):new JSONArray();if(wishlist==null)wishlist=new JSONArray();
         if(books.length()>100000||people.length()>100000||loans.length()>500000||wishlist.length()>100000)throw new IllegalArgumentException("Backup excede o limite de registros.");

@@ -27,8 +27,8 @@ public class MainActivity extends Activity {
     private JSONObject initial=new JSONObject();
     private int generation=0;
     private final int wine=Color.rgb(142,47,60),wineDark=Color.rgb(102,35,45),gold=Color.rgb(211,151,45),ink=Color.rgb(66,45,43),paper=Color.rgb(250,244,235),cardPaper=Color.rgb(255,251,246),blush=Color.rgb(248,229,224),line=Color.rgb(229,208,199),green=Color.rgb(73,126,84);
-    private static final String[] BOOK_FIELDS={"title","author","year"};
-    private static final String[] LABELS={"Título *","Autor *","Ano de lançamento"};
+    private static final String[] BOOK_FIELDS={"author","illustrator","title","publisher","year"};
+    private static final String[] LABELS={"Autor *","Ilustrador","Título *","Editora","Ano de publicação"};
     @Override public void onCreate(Bundle state){
         super.onCreate(state);db=new Db(this);
         if(state!=null){page=state.getString("page","home");selected=state.getLong("selected");editing=state.getLong("editing");}
@@ -148,7 +148,9 @@ public class MainActivity extends Activity {
     private void book(long id){
         List<JSONObject> found=db.rows("SELECT * FROM books WHERE id=?",""+id);if(found.isEmpty()){books();return;}JSONObject b=found.get(0);selected=id;
         layout("Detalhes do livro","book");cover(body,b.optString("cover",""));TextView bookTitle=text(body,b.optString("title"),25);bookTitle.setTypeface(Typeface.SERIF,Typeface.BOLD);text(body,b.optString("author"),19);
-        if(!b.optString("year").isEmpty())text(body,"Ano: "+b.optString("year"),16);
+        if(!b.optString("illustrator").isEmpty())text(body,"Ilustrador: "+b.optString("illustrator"),16);
+        if(!b.optString("publisher").isEmpty())text(body,"Editora: "+b.optString("publisher"),16);
+        if(!b.optString("year").isEmpty())text(body,"Ano de publicação: "+b.optString("year"),16);
         text(body,stars(b.optInt("rating",0)),22);
         List<JSONObject> active=db.rows("SELECT l.id,p.name FROM loans l JOIN people p ON p.id=l.person_id WHERE l.book_id=? AND l.returned_at IS NULL",""+id);
         if(active.isEmpty()){text(body,"Disponível",18);button(body,"Emprestar este livro",()->lend(id));}
@@ -169,15 +171,17 @@ public class MainActivity extends Activity {
         JSONObject b=provided;if(b==null&&id>0){List<JSONObject> found=db.rows("SELECT * FROM books WHERE id=?",""+id);if(!found.isEmpty())b=found.get(0);}if(b==null)b=new JSONObject();
         editing=id;layout(id==0?"Adicionar livro":"Editar livro","edit");
         pendingCover=b.optString("cover","");
-        text(body,"Foto do seu livro",14).setTypeface(null,Typeface.BOLD);
-        if(!pendingCover.isEmpty())cover(body,pendingCover);
-        button(body,pendingCover.isEmpty()?"📷  Fazer foto do livro":"📷  Refazer foto do livro",this::takeBookPhoto);
-        if(!pendingCover.isEmpty())button(body,"Remover foto",()->{pendingCover="";JSONObject current=draft();try{current.put("_initial",initial);}catch(Exception ignored){}edit(editing,current);});
-        text(body,"Título e autor são obrigatórios. A avaliação é sua e pode ser alterada depois.",15);
+        text(body,"Autor e título são obrigatórios. Os demais dados são opcionais.",15);
         for(int i=0;i<BOOK_FIELDS.length;i++){
             EditText e=input(body,LABELS[i],b.optString(BOOK_FIELDS[i],""));fields.put(BOOK_FIELDS[i],e);
             if(BOOK_FIELDS[i].equals("year"))e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         }
+        text(body,"Capa do livro",16).setTypeface(null,Typeface.BOLD);
+        if(!pendingCover.isEmpty())cover(body,pendingCover);
+        button(body,pendingCover.isEmpty()?"Fazer foto da capa":"Tirar outra foto",this::takeBookPhoto);
+        button(body,"Escolher imagem da galeria",this::chooseCoverFromGallery);
+        if(!pendingCover.isEmpty())button(body,"Remover capa",()->{pendingCover="";JSONObject current=draft();try{current.put("_initial",initial);}catch(Exception ignored){}edit(editing,current);});
+        text(body,"A busca online pode preencher os dados e a capa, quando disponíveis.",14);
         text(body,"Sua avaliação",14);
         ratingBar=new RatingBar(this,null,android.R.attr.ratingBarStyle);
         ratingBar.setNumStars(5);ratingBar.setStepSize(1f);ratingBar.setRating(b.optInt("rating",0));ratingBar.setIsIndicator(false);
@@ -196,6 +200,34 @@ public class MainActivity extends Activity {
         Intent camera=new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
         if(camera.resolveActivity(getPackageManager())==null){toast("Nenhum aplicativo de câmera disponível.");return;}
         try{startActivityForResult(camera,43);}catch(Exception e){toast("Não foi possível abrir a câmera.");}
+    }
+    private void chooseCoverFromGallery(){
+        Intent picker=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        picker.addCategory(Intent.CATEGORY_OPENABLE);
+        picker.setType("image/*");
+        try{startActivityForResult(picker,44);}catch(Exception e){toast("Não foi possível abrir a galeria.");}
+    }
+    private String encodeGallery(android.net.Uri uri)throws Exception {
+        byte[] bytes;
+        try(InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){
+            if(in==null)throw new IOException("Imagem indisponível.");
+            byte[] part=new byte[8192];int n;
+            while((n=in.read(part))!=-1){
+                if(out.size()+n>12*1024*1024)throw new IOException("Imagem muito grande (máximo de 12 MB).");
+                out.write(part,0,n);
+            }
+            bytes=out.toByteArray();
+        }
+        BitmapFactory.Options opts=new BitmapFactory.Options();
+        opts.inJustDecodeBounds=true;
+        BitmapFactory.decodeByteArray(bytes,0,bytes.length,opts);
+        if(opts.outWidth<=0||opts.outHeight<=0)throw new IOException("Arquivo de imagem inválido.");
+        opts.inSampleSize=1;
+        while(Math.max(opts.outWidth/opts.inSampleSize,opts.outHeight/opts.inSampleSize)>1200)opts.inSampleSize*=2;
+        opts.inJustDecodeBounds=false;
+        Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,opts);
+        if(bitmap==null)throw new IOException("Não foi possível abrir esta imagem.");
+        return encodePhoto(bitmap);
     }
     private String encodePhoto(Bitmap bitmap){
         if(bitmap==null)return "";
@@ -230,14 +262,24 @@ public class MainActivity extends Activity {
         });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível consultar. Você pode salvar normalmente com título e autor.");});}});
     }
     private void loadDetails(JSONObject result,int token){
-        ProgressDialog progress=ProgressDialog.show(this,"Carregando informações","Buscando título, autor e ano...",true,true);
-        worker.execute(()->{try{JSONObject info=BookSearch.details(result);runOnUiThread(()->{
-            if(isFinishing()||isDestroyed())return;boolean canceled=!progress.isShowing();progress.dismiss();if(canceled||generation!=token)return;
-            confirm("Usar estas informações?","Título, autor e ano encontrados serão preenchidos. Sua avaliação e a foto do livro não serão alteradas.",()->{
-                for(String f:BOOK_FIELDS)if(!info.optString(f).isEmpty())fields.get(f).setText(info.optString(f));
-                toast("Informações preenchidas. Revise e toque em Salvar.");
+        ProgressDialog progress=ProgressDialog.show(this,"Carregando informações","Buscando dados e capa do livro...",true,true);
+        worker.execute(()->{try{
+            JSONObject info=BookSearch.details(result);
+            byte[] coverBytes=BookSearch.coverBytes(result);
+            Bitmap image=coverBytes==null?null:BitmapFactory.decodeByteArray(coverBytes,0,coverBytes.length);
+            String apiCover=image==null?"":encodePhoto(image);
+            runOnUiThread(()->{
+                if(isFinishing()||isDestroyed())return;boolean canceled=!progress.isShowing();progress.dismiss();if(canceled||generation!=token)return;
+                confirm("Usar estas informações?","Os dados encontrados serão preenchidos. Se ainda não houver capa selecionada, a imagem da Open Library será utilizada quando disponível.",()->{
+                    if(!page.equals("edit")||generation!=token)return;
+                    for(String f:BOOK_FIELDS)if(!info.optString(f).isEmpty())fields.get(f).setText(info.optString(f));
+                    if(pendingCover.isEmpty()&&!apiCover.isEmpty())pendingCover=apiCover;
+                    JSONObject current=draft();try{current.put("_initial",initial);}catch(Exception ignored){}
+                    edit(editing,current);
+                    toast("Dados preenchidos. Revise e toque em Salvar.");
+                });
             });
-        });}catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível carregar os detalhes. Continue manualmente.");});}});
+        }catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível carregar os detalhes. Continue manualmente.");});}});
     }
     private void lend(long preselected){
         selected=preselected;layout("Emprestar","lend");
@@ -457,6 +499,20 @@ public class MainActivity extends Activity {
             pendingCover=encodePhoto(bitmap);
             JSONObject current=draft();try{current.put("_initial",initial);}catch(Exception ignored){}
             edit(editing,current);toast("Foto do livro adicionada.");return;
+        }
+        if(request==44){
+            if(result!=RESULT_OK||data==null||data.getData()==null)return;
+            android.net.Uri imageUri=data.getData();int token=generation;
+            worker.execute(()->{try{
+                String image=encodeGallery(imageUri);
+                runOnUiThread(()->{
+                    if(isDestroyed()||isFinishing()||generation!=token||!page.equals("edit"))return;
+                    pendingCover=image;
+                    JSONObject current=draft();try{current.put("_initial",initial);}catch(Exception ignored){}
+                    edit(editing,current);toast("Capa selecionada da galeria.");
+                });
+            }catch(Exception e){runOnUiThread(()->{if(!isDestroyed()&&generation==token)toast("Não foi possível importar a imagem. "+e.getMessage());});}});
+            return;
         }
         if(result!=RESULT_OK||data==null||data.getData()==null)return;android.net.Uri uri=data.getData();
         if(request==41)worker.execute(()->{try{byte[] bytes=db.backup().toString(2).getBytes("UTF-8");if(bytes.length>50*1024*1024)throw new IOException("Backup excede 50 MB.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Arquivo indisponível");out.write(bytes);}runOnUiThread(()->{if(!isDestroyed())toast("Backup exportado. Guarde uma cópia fora do celular.");});}catch(Exception e){runOnUiThread(()->{if(!isDestroyed())toast("Falha ao exportar o backup. Tente outro local.");});}});

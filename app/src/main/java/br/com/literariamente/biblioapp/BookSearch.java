@@ -24,7 +24,7 @@ public final class BookSearch {
     static JSONObject json(String url)throws Exception{return new JSONObject(new String(fetch(url,5*1024*1024),"UTF-8"));}
     static String enc(String s)throws Exception{return URLEncoder.encode(s,"UTF-8");}
     static JSONArray searchDocs(String query)throws Exception{
-        String fields="key,title,author_name,first_publish_year,editions,editions.title,editions.language,editions.publish_date";
+        String fields="key,title,author_name,first_publish_year,publisher,cover_i,cover_edition_key,editions,editions.title,editions.language,editions.publish_date,editions.publisher,editions.cover_i";
         JSONObject result=json("https://openlibrary.org/search.json?"+query+"&lang=pt&limit=15&fields="+enc(fields));
         JSONArray docs=result.optJSONArray("docs");
         return docs==null?new JSONArray():docs;
@@ -97,6 +97,21 @@ public final class BookSearch {
         java.util.regex.Matcher match=java.util.regex.Pattern.compile("\\b[12][0-9]{3}\\b").matcher(date);
         return match.find()?match.group():doc.optString("first_publish_year","");
     }
+    static String firstValue(JSONObject doc,String name){
+        Object value=doc.opt(name);
+        if(value instanceof JSONArray)return ((JSONArray)value).optString(0,"");
+        return value instanceof String?(String)value:"";
+    }
+    /** The covers API is optional. A missing image never blocks editing. */
+    public static byte[] coverBytes(JSONObject doc){
+        JSONObject edition=preferredEdition(doc);
+        int id=edition==null?0:edition.optInt("cover_i",0);
+        if(id<=0)id=doc.optInt("cover_i",0);
+        if(id>0)try{return fetch("https://covers.openlibrary.org/b/id/"+id+"-L.jpg?default=false",3*1024*1024);}catch(Exception ignored){}
+        String olid=doc.optString("cover_edition_key","");
+        if(olid.matches("[A-Za-z0-9]+"))try{return fetch("https://covers.openlibrary.org/b/olid/"+olid+"-L.jpg?default=false",3*1024*1024);}catch(Exception ignored){}
+        return null;
+    }
     public static JSONObject details(JSONObject doc)throws Exception{
         JSONObject out=new JSONObject();
         out.put("title",resultTitle(doc));
@@ -104,6 +119,10 @@ public final class BookSearch {
         if(names!=null)for(int i=0;i<names.length();i++)authors+=(i==0?"":", ")+names.optString(i);
         out.put("author",authors);
         out.put("year",resultYear(doc));
+        JSONObject edition=preferredEdition(doc);
+        String publisher=edition==null?"":firstValue(edition,"publisher");
+        if(publisher.isEmpty())publisher=firstValue(doc,"publisher");
+        out.put("publisher",publisher);
         return out;
     }
 }
