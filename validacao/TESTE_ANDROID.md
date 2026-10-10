@@ -28,3 +28,11 @@ Usar emulador ou aparelho de teste sem dados reais. Build e lint:
 - Conferir contraste, teclado, botões e navegação em tela pequena, fonte ampliada e Android 15.
 
 Esses testes em Android não foram executados no ambiente de criação do ZIP.
+
+- Confirmar a ordem Autor, Ilustrador, Título, Editora, Ano de publicação no formulário.
+- Selecionar um resultado online com capa e verificar que a imagem fica disponível offline.
+- Substituir a capa usando uma imagem já salva na galeria e verificar após reiniciar o aplicativo.
+- Fotografar a capa e substituir novamente por imagem da galeria; a capa mais recente deve prevalecer.
+- Editar um livro antigo da versão 3, preencher ilustrador e editora e verificar que empréstimos e avaliação permanecem.
+- Exportar backup versão 4 com ilustrador e editora, restaurar e conferir todos os dados.
+- Restaurar um backup da versão 3 e verificar que ilustrador começa vazio sem perder outras informações.
