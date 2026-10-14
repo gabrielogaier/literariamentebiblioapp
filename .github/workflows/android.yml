@@ -33,11 +33,10 @@ jobs:
           java-version: '17'
           cache: gradle
 
-      - name: Configurar Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Instalar SDK Android 36
-        run: sdkmanager --install "platforms;android-36" "build-tools;35.0.0"
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;35.0.0"
 
       - name: Permitir execução do Gradle
         run: chmod +x gradlew
