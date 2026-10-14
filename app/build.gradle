@@ -4,12 +4,12 @@ def buildNumber = providers.gradleProperty("appVersionCode").orElse("1").get().t
 
 android {
     namespace 'br.com.literariamente.biblioapp'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId 'br.com.literariamente.biblioapp'
         minSdk 23
-        targetSdk 35
+        targetSdk 36
         versionCode = buildNumber
         versionName = "1.0." + buildNumber
     }
@@ -21,7 +21,7 @@ android {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("ANDROID_KEY_ALIAS")
-                keyPassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
             }
         }
     }
