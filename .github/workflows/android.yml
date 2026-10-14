@@ -3,6 +3,11 @@ name: Build Android (APK e AAB)
 on:
   workflow_dispatch:
     inputs:
+      premium_teste:
+        description: 'Ativar bloqueios Premium apenas para testar no Google Play (não publica release)'
+        type: boolean
+        required: false
+        default: false
       publicar_release:
         description: 'Publicar APK e AAB em um novo GitHub Release'
         type: boolean
@@ -44,10 +49,13 @@ jobs:
       - name: Testar estrutura do banco
         run: python3 validacao/test_schema.py
 
+      - name: Testar regras do Premium
+        run: python3 validacao/test_premium.py
+
       # Pull requests não recebem acesso às chaves de assinatura.
       - name: Validar compilação de pull request
         if: github.event_name == 'pull_request'
-        run: ./gradlew assembleDebug -PappVersionCode=${{ github.run_number }}
+        run: ./gradlew assembleDebug -PappVersionCode=${{ github.run_number }} -PpremiumEnforcement=false
 
       - name: Preparar assinatura de release
         if: github.event_name != 'pull_request'
@@ -71,7 +79,7 @@ jobs:
             echo "::error::Secrets de assinatura incompletos."
             exit 1
           fi
-          ./gradlew assembleRelease bundleRelease -PappVersionCode=${{ github.run_number }}
+          ./gradlew assembleRelease bundleRelease -PappVersionCode=${{ github.run_number }} -PpremiumEnforcement=${{ github.event_name == 'workflow_dispatch' && inputs.premium_teste && 'true' || 'false' }}
 
       - name: Preparar arquivos de distribuição
         if: github.event_name != 'pull_request'
@@ -95,6 +103,7 @@ jobs:
     needs: build
     if: >-
       github.ref == 'refs/heads/main' &&
+      (!inputs.premium_teste) &&
       ((github.event_name == 'push' && github.event.head_commit.message == 'Publica release do Literariamente') ||
        (github.event_name == 'workflow_dispatch' && inputs.publicar_release))
     runs-on: ubuntu-latest

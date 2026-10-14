@@ -1,6 +1,14 @@
 plugins { id 'com.android.application' }
 
+dependencies {
+    implementation 'com.android.billingclient:billing:9.1.0'
+    // Alinha bibliotecas Kotlin transitivas e evita classes duplicadas do AndroidX.
+    implementation platform('org.jetbrains.kotlin:kotlin-bom:1.8.22')
+}
+
 def buildNumber = providers.gradleProperty("appVersionCode").orElse("1").get().toInteger()
+// Inativo em releases normais, ativável apenas em builds de testes internos.
+def premiumEnabled = providers.gradleProperty("premiumEnforcement").orElse("false").get().toBoolean()
 
 android {
     namespace 'br.com.literariamente.biblioapp'
@@ -12,6 +20,10 @@ android {
         targetSdk 36
         versionCode = buildNumber
         versionName = "1.0." + buildNumber
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     signingConfigs {
@@ -32,7 +44,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)
+        }
         release {
+            // Ativar somente depois de configurar o produto e as cortesias no Play Console.
+            buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)
             minifyEnabled false
             signingConfig = signingConfigs.release
         }

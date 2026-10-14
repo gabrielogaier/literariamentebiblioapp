@@ -117,3 +117,10 @@ O APK completo não foi gerado neste ambiente: não há SDK Android instalado e 
 Conecte este repositório ao Codemagic e selecione o workflow `android-debug` definido em `codemagic.yaml`. Ao concluir o build, baixe o APK em Artifacts. A configuração gera APK debug e não precisa de chaves próprias. Não configura publicação em loja nem envio de e-mail. Para uma versão release assinada, use o armazenamento de credenciais do serviço; nunca salve keystore ou senhas no repositório.
 
 Referência: https://docs.codemagic.io/yaml-quick-start/building-a-native-android-app/
+
+
+## Premium e Google Play
+
+O aplicativo usa a biblioteca Google Play Billing para uma **compra única** de `literariamente_premium` (preço configurado na Play Console). O cadastro e a exportação JSON são gratuitos; empréstimos, pessoas, histórico e restauração de backup são Premium. Nenhum dado da biblioteca é enviado a servidores do projeto.
+
+**A cobrança está intencionalmente desativada** por padrão via `-PpremiumEnforcement=false` (gerado em `BuildConfig.PREMIUM_ENFORCEMENT_ENABLED`) até que o produto, testes e códigos promocionais estejam prontos. Leia [PREMIUM_PLAY_CONSOLE.md](PREMIUM_PLAY_CONSOLE.md) antes de mudar a flag. Não publique uma versão com bloqueios antes de emitir e testar as cortesias dos usuários antigos.
