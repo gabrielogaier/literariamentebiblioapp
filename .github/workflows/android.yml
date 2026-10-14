@@ -1,7 +1,13 @@
-name: Build Android APK
+name: Build Android (APK e AAB)
 
 on:
   workflow_dispatch:
+    inputs:
+      publicar_release:
+        description: 'Publicar APK e AAB em um novo GitHub Release'
+        type: boolean
+        required: false
+        default: false
   pull_request:
     branches:
       - main
@@ -10,7 +16,7 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -27,23 +33,35 @@ jobs:
           java-version: '17'
           cache: gradle
 
+      - name: Instalar SDK Android 36
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" "build-tools;35.0.0"
+
       - name: Permitir execução do Gradle
         run: chmod +x gradlew
 
       - name: Testar estrutura do banco
         run: python3 validacao/test_schema.py
 
-      - name: Preparar assinatura
+      # Pull requests não recebem acesso às chaves de assinatura.
+      - name: Validar compilação de pull request
+        if: github.event_name == 'pull_request'
+        run: ./gradlew assembleDebug -PappVersionCode=${{ github.run_number }}
+
+      - name: Preparar assinatura de release
+        if: github.event_name != 'pull_request'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "Secret ANDROID_KEYSTORE_BASE64 não configurado."
+            echo "::error::Secret ANDROID_KEYSTORE_BASE64 não configurado."
             exit 1
           fi
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/literariamente-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/literariamente-release.jks"
 
-      - name: Build APK assinado
+      - name: Build APK e AAB assinados
+        if: github.event_name != 'pull_request'
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/literariamente-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -51,24 +69,57 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
-            echo "Secrets de assinatura incompletos."
+            echo "::error::Secrets de assinatura incompletos."
             exit 1
           fi
-          ./gradlew assembleRelease -PappVersionCode=${{ github.run_number }}
+          ./gradlew assembleRelease bundleRelease -PappVersionCode=${{ github.run_number }}
 
-      - name: Renomear APK
-        run: mv app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/Literariamente-Biblio.apk
+      - name: Preparar arquivos de distribuição
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk dist/Literariamente-Biblio.apk
+          cp app/build/outputs/bundle/release/app-release.aab dist/Literariamente-Biblio.aab
+          test -s dist/Literariamente-Biblio.apk
+          test -s dist/Literariamente-Biblio.aab
 
-      - name: Upload APK
+      - name: Upload APK e AAB
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v6
         with:
           name: Literariamente-Biblio
-          path: app/build/outputs/apk/release/Literariamente-Biblio.apk
+          path: dist/
+          if-no-files-found: error
 
-      - name: Publicar Release
-        if: github.event_name == 'push' && github.event.head_commit.message == 'Publica release do Literariamente'
+  publish:
+    name: Publicar GitHub Release
+    needs: build
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'push' && github.event.head_commit.message == 'Publica release do Literariamente') ||
+       (github.event_name == 'workflow_dispatch' && inputs.publicar_release))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Baixar APK e AAB
+        uses: actions/download-artifact@v6
+        with:
+          name: Literariamente-Biblio
+          path: dist/
+
+      - name: Publicar Release com os dois formatos
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="v1.0.${GITHUB_RUN_NUMBER}"
-          gh release create "$VERSION"             app/build/outputs/apk/release/Literariamente-Biblio.apk             --repo "${GITHUB_REPOSITORY}"             --target "${GITHUB_SHA}"             --title "Literariamente $VERSION"             --notes "Cadastro bibliográfico com autor, ilustrador, título, editora e ano de publicação; capas da Open Library, câmera ou galeria. Preserva biblioteca e backups existentes."
+          test -s dist/Literariamente-Biblio.apk
+          test -s dist/Literariamente-Biblio.aab
+          gh release create "$VERSION" \
+            dist/Literariamente-Biblio.apk \
+            dist/Literariamente-Biblio.aab \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "Literariamente $VERSION" \
+            --notes "APK assinado para instalação direta e AAB assinado para envio à Google Play Console. Faça backup da biblioteca antes de migrar entre instalações com assinaturas diferentes."
