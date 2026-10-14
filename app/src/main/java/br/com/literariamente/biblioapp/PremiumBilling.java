@@ -23,6 +23,7 @@ final class PremiumBilling implements PurchasesUpdatedListener {
     private final MessageListener notify;
     private boolean owned;
     private boolean connected;
+    private boolean connecting;
     private String formattedPrice = "Consulte a Google Play";
 
     PremiumBilling(Activity activity,Runnable changed,MessageListener notify){
@@ -45,16 +46,19 @@ final class PremiumBilling implements PurchasesUpdatedListener {
         activity.runOnUiThread(changed);
     }
     private void connect(){
+        if(connected||connecting)return;
+        connecting=true;
         client.startConnection(new BillingClientStateListener(){
             @Override public void onBillingSetupFinished(BillingResult result){
+                connecting=false;
                 connected=result.getResponseCode()==BillingClient.BillingResponseCode.OK;
                 if(connected){refresh();loadPrice(null);}
             }
-            @Override public void onBillingServiceDisconnected(){connected=false;}
+            @Override public void onBillingServiceDisconnected(){connected=false;connecting=false;}
         });
     }
     void refresh(){
-        if(!connected)return; // Não revogar compra por falta de conexão.
+        if(!connected){connect();return;} // Não revogar compra por falta de conexão.
         QueryPurchasesParams params=QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build();
         client.queryPurchasesAsync(params,(result,purchases)->{
             if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK)return;
@@ -83,6 +87,7 @@ final class PremiumBilling implements PurchasesUpdatedListener {
     }
     private void loadPrice(ProductCallback done){
         if(!connected){
+            connect();
             if(done!=null)activity.runOnUiThread(()->notify.show("Google Play indisponível. Verifique sua conexão e tente novamente."));
             return;
         }
