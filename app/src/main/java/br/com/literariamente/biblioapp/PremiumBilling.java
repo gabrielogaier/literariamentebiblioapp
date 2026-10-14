@@ -18,12 +18,14 @@ final class PremiumBilling implements PurchasesUpdatedListener {
     private final Activity activity;
     private final BillingClient client;
     private final Runnable changed;
-    private final java.util.function.Consumer<String> notify;
+    interface MessageListener { void show(String message); }
+    interface ProductCallback { void accept(ProductDetails product); }
+    private final MessageListener notify;
     private boolean owned;
     private boolean connected;
     private String formattedPrice = "Consulte a Google Play";
 
-    PremiumBilling(Activity activity,Runnable changed,java.util.function.Consumer<String> notify){
+    PremiumBilling(Activity activity,Runnable changed,MessageListener notify){
         this.activity=activity;this.changed=changed;this.notify=notify;
         owned=activity.getSharedPreferences(PREFS,Context.MODE_PRIVATE).getBoolean(ENTITLED,false);
         client=BillingClient.newBuilder(activity)
@@ -63,7 +65,7 @@ final class PremiumBilling implements PurchasesUpdatedListener {
                         found=true;
                         acknowledge(p);
                     }else if(p.getPurchaseState()==Purchase.PurchaseState.PENDING){
-                        activity.runOnUiThread(()->notify.accept("Pagamento pendente. O Premium será liberado após a confirmação."));
+                        activity.runOnUiThread(()->notify.show("Pagamento pendente. O Premium será liberado após a confirmação."));
                     }
                 }
             }
@@ -76,12 +78,12 @@ final class PremiumBilling implements PurchasesUpdatedListener {
             AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.getPurchaseToken()).build(),
             result->{
                 if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK)
-                    activity.runOnUiThread(()->notify.accept("Não foi possível confirmar a compra. Verifique sua conexão."));
+                    activity.runOnUiThread(()->notify.show("Não foi possível confirmar a compra. Verifique sua conexão."));
             });
     }
-    private void loadPrice(java.util.function.Consumer<ProductDetails> done){
+    private void loadPrice(ProductCallback done){
         if(!connected){
-            if(done!=null)activity.runOnUiThread(()->notify.accept("Google Play indisponível. Verifique sua conexão e tente novamente."));
+            if(done!=null)activity.runOnUiThread(()->notify.show("Google Play indisponível. Verifique sua conexão e tente novamente."));
             return;
         }
         QueryProductDetailsParams params=QueryProductDetailsParams.newBuilder()
@@ -93,13 +95,13 @@ final class PremiumBilling implements PurchasesUpdatedListener {
             .build();
         client.queryProductDetailsAsync(params,(result,details)->{
             if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK || details.getProductDetailsList().isEmpty()){
-                if(done!=null)activity.runOnUiThread(()->notify.accept("Produto Premium indisponível na Google Play."));
+                if(done!=null)activity.runOnUiThread(()->notify.show("Produto Premium indisponível na Google Play."));
                 return;
             }
             ProductDetails product=details.getProductDetailsList().get(0);
             List<ProductDetails.OneTimePurchaseOfferDetails> offers=product.getOneTimePurchaseOfferDetailsList();
             if(offers==null||offers.isEmpty()){
-                if(done!=null)activity.runOnUiThread(()->notify.accept("Oferta Premium indisponível."));
+                if(done!=null)activity.runOnUiThread(()->notify.show("Oferta Premium indisponível."));
                 return;
             }
             formattedPrice=offers.get(0).getFormattedPrice();
@@ -108,7 +110,7 @@ final class PremiumBilling implements PurchasesUpdatedListener {
         });
     }
     void buy(){
-        if(owned){notify.accept("O Premium já está ativo nesta conta.");return;}
+        if(owned){notify.show("O Premium já está ativo nesta conta.");return;}
         loadPrice(product->{
             List<ProductDetails.OneTimePurchaseOfferDetails> offers=product.getOneTimePurchaseOfferDetailsList();
             if(offers==null||offers.isEmpty())return;
@@ -119,12 +121,12 @@ final class PremiumBilling implements PurchasesUpdatedListener {
             BillingResult launched=client.launchBillingFlow(activity,BillingFlowParams.newBuilder()
                 .setProductDetailsParamsList(Collections.singletonList(item)).build());
             if(launched.getResponseCode()!=BillingClient.BillingResponseCode.OK)
-                notify.accept("Não foi possível iniciar a compra na Google Play.");
+                notify.show("Não foi possível iniciar a compra na Google Play.");
         });
     }
     @Override public void onPurchasesUpdated(BillingResult result,List<Purchase> purchases){
         if(result.getResponseCode()==BillingClient.BillingResponseCode.OK){refresh();}
         else if(result.getResponseCode()!=BillingClient.BillingResponseCode.USER_CANCELED)
-            activity.runOnUiThread(()->notify.accept("A compra não foi concluída. Verifique a Google Play."));
+            activity.runOnUiThread(()->notify.show("A compra não foi concluída. Verifique a Google Play."));
     }
 }
