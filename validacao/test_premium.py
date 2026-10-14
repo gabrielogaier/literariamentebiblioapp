@@ -18,5 +18,5 @@ assert 'PRODUCT_ID = "literariamente_premium"' in billing
 assert "Purchase.PurchaseState.PURCHASED" in billing
 assert "client.acknowledgePurchase" in billing
 assert "setOwned(found)" in billing
-assert "if(!connected)return;" in billing
+assert "if(!connected){connect();return;}" in billing
 print("Regras estáticas do Premium OK (testes de checkout em Android/Play Console ainda necessários).")
