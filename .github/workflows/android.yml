@@ -44,6 +44,9 @@ jobs:
       - name: Testar estrutura do banco
         run: python3 validacao/test_schema.py
 
+      - name: Testar regras do Premium
+        run: python3 validacao/test_premium.py
+
       # Pull requests não recebem acesso às chaves de assinatura.
       - name: Validar compilação de pull request
         if: github.event_name == 'pull_request'

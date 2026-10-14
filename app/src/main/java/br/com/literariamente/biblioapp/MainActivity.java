@@ -17,6 +17,7 @@ import java.util.concurrent.*;
 
 public class MainActivity extends Activity {
     private Db db;
+    private PremiumBilling premiumBilling;
     private LinearLayout body,root;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private final Map<String,EditText> fields=new LinkedHashMap<>();
@@ -31,14 +32,49 @@ public class MainActivity extends Activity {
     private static final String[] LABELS={"Autor *","Ilustrador","Título *","Editora","Ano de publicação"};
     @Override public void onCreate(Bundle state){
         super.onCreate(state);db=new Db(this);
+        premiumBilling=new PremiumBilling(this,()->{if(page.equals("home"))home();},this::toast);
         if(state!=null){page=state.getString("page","home");selected=state.getLong("selected");editing=state.getLong("editing");}
         if(page.equals("edit")){
             JSONObject draft=null;try{if(state!=null&&state.getBoolean("hasDraft")){try(FileInputStream in=openFileInput("editor-draft.json");ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);draft=new JSONObject(out.toString("UTF-8"));}}}catch(Exception ignored){}
             edit(editing,draft);
-        }else if(page.equals("book"))book(selected);else if(page.equals("person"))person(selected);else if(page.equals("people"))people();else if(page.equals("history"))history();else if(page.equals("books"))books();else if(page.equals("lend"))lend(selected);else if(page.equals("wishlist"))wishlist();else home();
+        }else if(page.equals("book"))book(selected);else if(page.equals("person"))person(selected);else if(page.equals("people"))people();else if(page.equals("history"))history();else if(page.equals("books"))books();else if(page.equals("lend"))lend(selected);else if(page.equals("wishlist"))wishlist();else if(page.equals("premium"))premium();else home();
     }
     @Override protected void onSaveInstanceState(Bundle s){super.onSaveInstanceState(s);s.putString("page",page);s.putLong("selected",selected);s.putLong("editing",editing);if(page.equals("edit")){try{JSONObject d=draft();d.put("_initial",initial);try(FileOutputStream out=openFileOutput("editor-draft.json",MODE_PRIVATE)){out.write(d.toString().getBytes("UTF-8"));}s.putBoolean("hasDraft",true);}catch(Exception ignored){}}}
-    @Override protected void onDestroy(){worker.shutdownNow();super.onDestroy();}
+    @Override protected void onResume(){super.onResume();if(premiumBilling!=null)premiumBilling.refresh();}
+    @Override protected void onDestroy(){worker.shutdownNow();if(premiumBilling!=null)premiumBilling.close();super.onDestroy();}
+    private boolean premiumAllowed(){return !BuildConfig.PREMIUM_ENFORCEMENT_ENABLED || (premiumBilling!=null && premiumBilling.hasPremium());}
+    private boolean requirePremium(String feature){
+        if(premiumAllowed())return true;
+        new AlertDialog.Builder(this).setTitle("Literariamente Premium")
+            .setMessage("Para usar "+feature+", desbloqueie o Premium com pagamento único. Sua biblioteca continua disponível gratuitamente.")
+            .setNegativeButton("Agora não",null)
+            .setPositiveButton("Conhecer Premium",(d,w)->premium()).show();
+        return false;
+    }
+    private void premium(){
+        layout("Premium","premium");
+        text(body,"Biblioteca gratuita para sempre. Premium é uma compra única, sem assinatura.",17);
+        LinearLayout c=card(body);
+        text(c,"O Premium desbloqueia:",19).setTypeface(Typeface.SERIF,Typeface.BOLD);
+        text(c,"• Empréstimos e devoluções\n• Cadastro de pessoas e histórico\n• Importação e restauração de backup",16);
+        text(c,"A exportação do backup continua gratuita. Seus livros ficam somente no dispositivo, sem servidor do Literariamente.",15);
+        if(!BuildConfig.PREMIUM_ENFORCEMENT_ENABLED){
+            text(body,"Compras em preparação. Os recursos atuais continuam gratuitos nesta versão.",16);
+            return;
+        }
+        if(premiumBilling!=null && premiumBilling.hasPremium()){
+            text(body,"Premium ativo nesta conta. Obrigado!",18);
+            button(body,"Verificar compra novamente",()->premiumBilling.refresh());
+        }else{
+            text(body,"Valor atual na Google Play: "+(premiumBilling==null?"indisponível":premiumBilling.price()),17);
+            primaryButton(body,"Comprar Premium",()->{if(premiumBilling!=null)premiumBilling.buy();});
+            button(body,"Já comprei / restaurar compra",()->{if(premiumBilling!=null)premiumBilling.refresh();});
+        }
+        button(body,"Resgatar código da Google Play",()->{
+            Intent i=new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://play.google.com/redeem"));
+            safe(()->startActivity(i));
+        });
+    }
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private void layout(String title,String current){
         generation++;page=current;fields.clear();ratingBar=null;
@@ -86,7 +122,8 @@ public class MainActivity extends Activity {
         button(body,"♡  Desejos",this::wishlist);
         button(body,"●  Pessoas",this::people);
         button(body,"◷  Histórico",this::history);
-        List<JSONObject> people=db.rows("SELECT p.id,p.name,COUNT(*) AS total FROM people p JOIN loans l ON l.person_id=p.id WHERE l.returned_at IS NULL GROUP BY p.id ORDER BY p.name COLLATE NOCASE");
+        button(body,BuildConfig.PREMIUM_ENFORCEMENT_ENABLED?"★  Literariamente Premium":"★  Premium (em preparação)",this::premium);
+        List<JSONObject> people=premiumAllowed()?db.rows("SELECT p.id,p.name,COUNT(*) AS total FROM people p JOIN loans l ON l.person_id=p.id WHERE l.returned_at IS NULL GROUP BY p.id ORDER BY p.name COLLATE NOCASE"):Collections.emptyList();
         if(!people.isEmpty()){
             text(body,"Com quem estão",21).setTypeface(Typeface.SERIF,Typeface.BOLD);
             for(JSONObject p:people){LinearLayout c=card(body);TextView n=text(c,p.optString("name"),19);n.setTypeface(Typeface.SERIF,Typeface.BOLD);text(c,p.optInt("total")+" livro(s)",15);button(c,"Ver livros",()->person(p.optLong("id")));}
@@ -152,11 +189,13 @@ public class MainActivity extends Activity {
         if(!b.optString("publisher").isEmpty())text(body,"Editora: "+b.optString("publisher"),16);
         if(!b.optString("year").isEmpty())text(body,"Ano de publicação: "+b.optString("year"),16);
         text(body,stars(b.optInt("rating",0)),22);
+        if(premiumAllowed()){
         List<JSONObject> active=db.rows("SELECT l.id,p.name FROM loans l JOIN people p ON p.id=l.person_id WHERE l.book_id=? AND l.returned_at IS NULL",""+id);
         if(active.isEmpty()){text(body,"Disponível",18);button(body,"Emprestar este livro",()->lend(id));}
         else{JSONObject l=active.get(0);text(body,"Com "+l.optString("name"),19);button(body,"Devolver",()->confirm("Registrar devolução?",b.optString("title"),()->safe(()->{db.giveBack(l.optLong("id"));book(id);toast("Devolução registrada.");})));}
-        button(body,"Editar livro e avaliação",()->edit(id,null));
         text(body,"Histórico deste livro",21);showHistory(body,db.rows("SELECT l.*,b.title,p.name FROM loans l JOIN books b ON b.id=l.book_id JOIN people p ON p.id=l.person_id WHERE b.id=? ORDER BY l.borrowed_at DESC",""+id));
+        }else button(body,"Gerenciar empréstimos (Premium)",this::premium);
+        button(body,"Editar livro e avaliação",()->edit(id,null));
     }
     private JSONObject draft(){
         JSONObject o=new JSONObject();
@@ -282,6 +321,7 @@ public class MainActivity extends Activity {
         }catch(Exception e){runOnUiThread(()->{if(isFinishing()||isDestroyed())return;progress.dismiss();if(generation==token)toast("Não foi possível carregar os detalhes. Continue manualmente.");});}});
     }
     private void lend(long preselected){
+        if(!requirePremium("empréstimos"))return;
         selected=preselected;layout("Emprestar","lend");
         List<JSONObject> available=db.rows("SELECT b.id,b.title,b.author FROM books b WHERE NOT EXISTS(SELECT 1 FROM loans l WHERE l.book_id=b.id AND l.returned_at IS NULL) ORDER BY b.title COLLATE NOCASE");
         if(available.isEmpty()){text(body,"Não há livros disponíveis para emprestar.",18);button(body,"Cadastrar livro",()->edit(0,null));return;}
@@ -446,6 +486,7 @@ public class MainActivity extends Activity {
     }
 
     private void people(){
+        if(!requirePremium("cadastro de pessoas"))return;
         layout("Pessoas","people");List<JSONObject> ps=db.rows("SELECT p.id,p.name,COUNT(l.id) AS total FROM people p LEFT JOIN loans l ON l.person_id=p.id AND l.returned_at IS NULL GROUP BY p.id ORDER BY p.name COLLATE NOCASE");
         if(ps.isEmpty()){text(body,"As pessoas são cadastradas durante o empréstimo.",17);return;}
         EditText filter=input(body,"Buscar pessoa por nome ou ID","");
@@ -463,6 +504,7 @@ public class MainActivity extends Activity {
         filter.addTextChangedListener(watcher(render));render.run();
     }
     private void person(long id){
+        if(!requirePremium("gestão de empréstimos"))return;
         List<JSONObject> found=db.rows("SELECT * FROM people WHERE id=?",""+id);if(found.isEmpty()){people();return;}selected=id;layout(found.get(0).optString("name"),"person");
         List<JSONObject> active=db.rows("SELECT l.id,b.title,b.author FROM loans l JOIN books b ON b.id=l.book_id WHERE l.person_id=? AND l.returned_at IS NULL ORDER BY b.title",""+id);
         text(body,active.size()+" livro(s) emprestado(s)",20);
@@ -470,6 +512,7 @@ public class MainActivity extends Activity {
         text(body,"Histórico",21);showHistory(body,db.rows("SELECT l.*,b.title,p.name FROM loans l JOIN books b ON b.id=l.book_id JOIN people p ON p.id=l.person_id WHERE p.id=? ORDER BY l.borrowed_at DESC",""+id));
     }
     private void history(){
+        if(!requirePremium("histórico de empréstimos"))return;
         layout("Histórico","history");
         List<JSONObject> loans=db.rows("SELECT l.*,b.title,p.name FROM loans l JOIN books b ON b.id=l.book_id JOIN people p ON p.id=l.person_id ORDER BY l.borrowed_at DESC");
         if(loans.isEmpty()){showHistory(body,loans);return;}
@@ -489,7 +532,7 @@ public class MainActivity extends Activity {
     }
     private void showHistory(LinearLayout parent,List<JSONObject> loans){if(loans.isEmpty())text(parent,"Nenhum empréstimo registrado.",16);for(JSONObject l:loans){LinearLayout c=card(parent);text(c,l.optString("title"),19);text(c,"Pessoa: "+l.optString("name")+"\nEmpréstimo: "+date(l.optLong("borrowed_at"))+"\n"+(l.isNull("returned_at")?"Em andamento":"Devolução: "+date(l.optLong("returned_at"))),15);}}
     private void exportBackup(){Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("application/json");i.putExtra(Intent.EXTRA_TITLE,"literariamente-backup-"+new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",Locale.ROOT).format(new Date())+".json");safe(()->startActivityForResult(i,41));}
-    private void importBackup(){Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("*/*");safe(()->startActivityForResult(i,42));}
+    private void importBackup(){if(!requirePremium("restauração de backup"))return;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("*/*");safe(()->startActivityForResult(i,42));}
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);
         if(request==43){
@@ -514,6 +557,7 @@ public class MainActivity extends Activity {
             }catch(Exception e){runOnUiThread(()->{if(!isDestroyed()&&generation==token)toast("Não foi possível importar a imagem. "+e.getMessage());});}});
             return;
         }
+        if(request==42&&!requirePremium("restauração de backup"))return;
         if(result!=RESULT_OK||data==null||data.getData()==null)return;android.net.Uri uri=data.getData();
         if(request==41)worker.execute(()->{try{byte[] bytes=db.backup().toString(2).getBytes("UTF-8");if(bytes.length>50*1024*1024)throw new IOException("Backup excede 50 MB.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Arquivo indisponível");out.write(bytes);}runOnUiThread(()->{if(!isDestroyed())toast("Backup exportado. Guarde uma cópia fora do celular.");});}catch(Exception e){runOnUiThread(()->{if(!isDestroyed())toast("Falha ao exportar o backup. Tente outro local.");});}});
         if(request==42)worker.execute(()->{try{JSONObject backup;try(InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){
