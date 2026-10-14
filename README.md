@@ -19,13 +19,25 @@ Aplicativo Android nativo para biblioteca pessoal, com foco em saber quem está 
 - Confirmação antes de substituir a biblioteca e restauração em transação.
 - Interface em português com navegação Início, Livros e Emprestar.
 
+## Distribuição automática: APK e AAB
+
+O workflow [Build Android (APK e AAB)](.github/workflows/android.yml) do GitHub Actions gera **APK** para instalação direta e **AAB** para Google Play Console. São criados com o mesmo código, identificador `br.com.literariamente.biblioapp` e número de versão, com `targetSdk 36` (Android 16).
+
+- Em **pull requests**, executa a validação SQLite e compila um APK debug, sem acessar secrets.
+- Em **push na main** ou **Actions > Build Android (APK e AAB) > Run workflow**, gera APK e AAB assinados, disponíveis em **Artifacts > Literariamente-Biblio**.
+- O Release do GitHub anexa os dois arquivos quando um push na `main` tem mensagem exata `Publica release do Literariamente`, ou quando a execução manual na `main` marca **publicar_release**.
+- Antes da primeira publicação na Play Store, configure o **Play App Signing**. O AAB é assinado com a chave de upload nos Secrets; a Google Play poderá assinar os APKs distribuídos com outra chave. Nesse caso, instalações feitas pelo GitHub podem não receber atualização diretamente pela Play Store. Exporte o backup antes de trocar a instalação.
+- Nunca envie a chave JKS ou senhas ao repositório. Configure os Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD` em **Settings > Secrets and variables > Actions**.
+
+Para publicar na loja, faça o download de `Literariamente-Biblio.aab`, crie uma versão na Google Play Console e envie o arquivo. A publicação na Play Store não é automática.
+
 ## Gerar o APK no Windows com Android Studio
 
 1. Extraia o ZIP para uma pasta normal, por exemplo `C:\Projetos\literariamente-biblioapp`.
 2. Abra o Android Studio e escolha **Open**, selecionando a pasta que contém `settings.gradle`.
 3. Aguarde o Gradle Sync. A primeira compilação precisa de internet no computador para baixar as ferramentas.
-4. Se solicitado, instale **Android SDK Platform 35** e **Build Tools 35.0.0** pelo SDK Manager.
-5. Use o JDK 17 ou o JDK compatível integrado ao Android Studio nas configurações do Gradle. O projeto usa Gradle 8.11.1 e Android Gradle Plugin 8.9.2.
+4. Se solicitado, instale **Android SDK Platform 36** e **Build Tools 35.0.0** pelo SDK Manager.
+5. Use o JDK 17 ou o JDK compatível integrado ao Android Studio nas configurações do Gradle. O projeto usa Gradle 8.11.1 e Android Gradle Plugin 8.10.1.
 6. Abra o terminal do Android Studio e execute:
 
 ```powershell
