@@ -27,7 +27,7 @@ O workflow [Build Android (APK e AAB)](.github/workflows/android.yml) do GitHub 
 - Em **push na main** ou **Actions > Build Android (APK e AAB) > Run workflow**, gera APK e AAB assinados, disponíveis em **Artifacts > Literariamente-Biblio**.
 - O Release do GitHub anexa os dois arquivos quando um push na `main` tem mensagem exata `Publica release do Literariamente`, ou quando a execução manual na `main` marca **publicar_release**.
 - Antes da primeira publicação na Play Store, configure o **Play App Signing**. O AAB é assinado com a chave de upload nos Secrets; a Google Play poderá assinar os APKs distribuídos com outra chave. Nesse caso, instalações feitas pelo GitHub podem não receber atualização diretamente pela Play Store. Exporte o backup antes de trocar a instalação.
-- Nunca envie a chave JKS ou senhas ao repositório. Configure os Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` e `ANDROID_KEY_PASSWORD` em **Settings > Secrets and variables > Actions**.
+- Nunca envie a chave JKS ou senhas ao repositório. Configure os Secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` em **Settings > Secrets and variables > Actions**. A chave existente usa a mesma senha do keystore, portanto não é necessário um Secret separado para a senha da chave.
 
 Para publicar na loja, faça o download de `Literariamente-Biblio.aab`, crie uma versão na Google Play Console e envie o arquivo. A publicação na Play Store não é automática.
 
