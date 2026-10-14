@@ -32,8 +32,9 @@ public class MainActivity extends Activity {
     private static final String[] LABELS={"Autor *","Ilustrador","Título *","Editora","Ano de publicação"};
     @Override public void onCreate(Bundle state){
         super.onCreate(state);db=new Db(this);
-        premiumBilling=new PremiumBilling(this,()->{if(page.equals("home"))home();},this::toast);
+        premiumBilling=new PremiumBilling(this,()->{if(isFinishing()||isDestroyed())return;if(page.equals("home"))home();else if(page.equals("premium"))premium();},message->{if(!isFinishing()&&!isDestroyed())toast(message);});
         if(state!=null){page=state.getString("page","home");selected=state.getLong("selected");editing=state.getLong("editing");}
+        if(!premiumAllowed()&&(page.equals("lend")||page.equals("people")||page.equals("person")||page.equals("history")))page="home";
         if(page.equals("edit")){
             JSONObject draft=null;try{if(state!=null&&state.getBoolean("hasDraft")){try(FileInputStream in=openFileInput("editor-draft.json");ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);draft=new JSONObject(out.toString("UTF-8"));}}}catch(Exception ignored){}
             edit(editing,draft);
@@ -557,7 +558,7 @@ public class MainActivity extends Activity {
             }catch(Exception e){runOnUiThread(()->{if(!isDestroyed()&&generation==token)toast("Não foi possível importar a imagem. "+e.getMessage());});}});
             return;
         }
-        if(request==42&&!requirePremium("restauração de backup"))return;
+        if(request==42&&result==RESULT_OK&&!requirePremium("restauração de backup"))return;
         if(result!=RESULT_OK||data==null||data.getData()==null)return;android.net.Uri uri=data.getData();
         if(request==41)worker.execute(()->{try{byte[] bytes=db.backup().toString(2).getBytes("UTF-8");if(bytes.length>50*1024*1024)throw new IOException("Backup excede 50 MB.");try(OutputStream out=getContentResolver().openOutputStream(uri,"wt")){if(out==null)throw new IOException("Arquivo indisponível");out.write(bytes);}runOnUiThread(()->{if(!isDestroyed())toast("Backup exportado. Guarde uma cópia fora do celular.");});}catch(Exception e){runOnUiThread(()->{if(!isDestroyed())toast("Falha ao exportar o backup. Tente outro local.");});}});
         if(request==42)worker.execute(()->{try{JSONObject backup;try(InputStream in=getContentResolver().openInputStream(uri);ByteArrayOutputStream out=new ByteArrayOutputStream()){
