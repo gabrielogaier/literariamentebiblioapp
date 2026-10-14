@@ -7,6 +7,8 @@ dependencies {
 }
 
 def buildNumber = providers.gradleProperty("appVersionCode").orElse("1").get().toInteger()
+// Inativo em releases normais, ativável apenas em builds de testes internos.
+def premiumEnabled = providers.gradleProperty("premiumEnforcement").orElse("false").get().toBoolean()
 
 android {
     namespace 'br.com.literariamente.biblioapp'
@@ -43,11 +45,11 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', 'false'
+            buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)
         }
         release {
             // Ativar somente depois de configurar o produto e as cortesias no Play Console.
-            buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', 'false'
+            buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)
             minifyEnabled false
             signingConfig = signingConfigs.release
         }

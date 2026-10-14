@@ -123,4 +123,4 @@ Referência: https://docs.codemagic.io/yaml-quick-start/building-a-native-androi
 
 O aplicativo usa a biblioteca Google Play Billing para uma **compra única** de `literariamente_premium` (preço configurado na Play Console). O cadastro e a exportação JSON são gratuitos; empréstimos, pessoas, histórico e restauração de backup são Premium. Nenhum dado da biblioteca é enviado a servidores do projeto.
 
-**A cobrança está intencionalmente desativada** com `BuildConfig.PREMIUM_ENFORCEMENT_ENABLED = false` até que o produto, testes e códigos promocionais estejam prontos. Leia [PREMIUM_PLAY_CONSOLE.md](PREMIUM_PLAY_CONSOLE.md) antes de mudar a flag. Não publique uma versão com bloqueios antes de emitir e testar as cortesias dos usuários antigos.
+**A cobrança está intencionalmente desativada** por padrão via `-PpremiumEnforcement=false` (gerado em `BuildConfig.PREMIUM_ENFORCEMENT_ENABLED`) até que o produto, testes e códigos promocionais estejam prontos. Leia [PREMIUM_PLAY_CONSOLE.md](PREMIUM_PLAY_CONSOLE.md) antes de mudar a flag. Não publique uma versão com bloqueios antes de emitir e testar as cortesias dos usuários antigos.

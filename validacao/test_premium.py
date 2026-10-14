@@ -6,13 +6,14 @@ billing = (ROOT / "app/src/main/java/br/com/literariamente/biblioapp/PremiumBill
 gradle = (ROOT / "app/build.gradle").read_text()
 
 assert "billing:9.1.0" in gradle
-assert gradle.count("'PREMIUM_ENFORCEMENT_ENABLED', 'false'") == 2, "Cobrança não pode ser ativada antes das cortesias"
+assert 'providers.gradleProperty("premiumEnforcement").orElse("false")' in gradle, "Premium deve ficar desligado por padrão"
+assert gradle.count("'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)") == 2
 assert 'if(!requirePremium("empréstimos"))return;' in main
 assert 'if(!requirePremium("cadastro de pessoas"))return;' in main
 assert 'if(!requirePremium("gestão de empréstimos"))return;' in main
 assert 'if(!requirePremium("histórico de empréstimos"))return;' in main
 assert 'if(!requirePremium("restauração de backup"))return;' in main
-assert 'if(request==42&&!requirePremium("restauração de backup"))return;' in main
+assert 'if(request==42&&result==RESULT_OK&&!requirePremium("restauração de backup"))return;' in main
 assert 'private void exportBackup(){Intent i=' in main, "Exportação deve continuar gratuita"
 assert 'PRODUCT_ID = "literariamente_premium"' in billing
 assert "Purchase.PurchaseState.PURCHASED" in billing
