@@ -50,7 +50,7 @@ O arquivo será criado em:
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Copie esse arquivo para o celular, abra e autorize a instalação pela origem utilizada, se o Android solicitar. O app exige Android 6.0 ou superior.
+Copie esse arquivo para o celular, abra e autorize a instalação pela origem utilizada, se o Android solicitar. O app exige Android 7.0 (API 24) ou superior, conforme exigência da Proteção Automática do Google Play.
 
 Em Linux ou macOS:
 
