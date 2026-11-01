@@ -6,7 +6,7 @@ billing = (ROOT / "app/src/main/java/br/com/literariamente/biblioapp/PremiumBill
 gradle = (ROOT / "app/build.gradle").read_text()
 
 assert "billing:9.1.0" in gradle
-assert 'providers.gradleProperty("premiumEnforcement").orElse("false")' in gradle, "Premium deve ficar desligado por padrão"
+assert 'providers.gradleProperty("premiumEnforcement").orElse("true")' in gradle, "Premium deve ficar ligado por padrão"
 assert gradle.count("'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)") == 2
 assert 'if(!requirePremium("empréstimos"))return;' in main
 assert 'if(!requirePremium("cadastro de pessoas"))return;' in main
