@@ -7,8 +7,8 @@ dependencies {
 }
 
 def buildNumber = providers.gradleProperty("appVersionCode").orElse("1").get().toInteger()
-// Inativo em releases normais, ativável apenas em builds de testes internos.
-def premiumEnabled = providers.gradleProperty("premiumEnforcement").orElse("false").get().toBoolean()
+// Premium habilitado por padrão. A flag pode ser desativada explicitamente apenas em builds locais.
+def premiumEnabled = providers.gradleProperty("premiumEnforcement").orElse("true").get().toBoolean()
 
 android {
     namespace 'br.com.literariamente.biblioapp'
@@ -48,7 +48,7 @@ android {
             buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)
         }
         release {
-            // Ativar somente depois de configurar o produto e as cortesias no Play Console.
+            // Premium ativo na versão de distribuição; validar produto e cortesias no Play Console.
             buildConfigField 'boolean', 'PREMIUM_ENFORCEMENT_ENABLED', String.valueOf(premiumEnabled)
             minifyEnabled false
             signingConfig = signingConfigs.release
