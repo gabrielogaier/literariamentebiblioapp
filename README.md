@@ -124,3 +124,7 @@ Referência: https://docs.codemagic.io/yaml-quick-start/building-a-native-androi
 O aplicativo usa a biblioteca Google Play Billing para uma **compra única** de `literariamente_premium` (preço configurado na Play Console). O cadastro e a exportação JSON são gratuitos; empréstimos, pessoas, histórico e restauração de backup são Premium. Nenhum dado da biblioteca é enviado a servidores do projeto.
 
 **O Premium está habilitado por padrão** via `-PpremiumEnforcement=true` (gerado em `BuildConfig.PREMIUM_ENFORCEMENT_ENABLED`). O AAB de distribuição mantém os bloqueios Premium ativos. Antes de enviar para revisão, confirme o produto na Play Console, os testes de compra/restauração e as cortesias dos usuários antigos. Consulte [PREMIUM_PLAY_CONSOLE.md](PREMIUM_PLAY_CONSOLE.md). Política de privacidade: [PRIVACIDADE.md](PRIVACIDADE.md).
+
+## Política de privacidade na Play Store
+
+O app exibe a política integralmente offline na tela inicial. O arquivo `docs/index.html` prepara a página pública em GitHub Pages. Para ativar: Settings > Pages > Build and deployment > Deploy from a branch > `main` / `/docs`. Após a publicação, confirmar o endereço `https://gabrielogaier.github.io/literariamentebiblioapp/` antes de informá-lo na Google Play Console.
