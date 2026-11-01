@@ -38,7 +38,7 @@ public class MainActivity extends Activity {
         if(page.equals("edit")){
             JSONObject draft=null;try{if(state!=null&&state.getBoolean("hasDraft")){try(FileInputStream in=openFileInput("editor-draft.json");ByteArrayOutputStream out=new ByteArrayOutputStream()){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1)out.write(b,0,n);draft=new JSONObject(out.toString("UTF-8"));}}}catch(Exception ignored){}
             edit(editing,draft);
-        }else if(page.equals("book"))book(selected);else if(page.equals("person"))person(selected);else if(page.equals("people"))people();else if(page.equals("history"))history();else if(page.equals("books"))books();else if(page.equals("lend"))lend(selected);else if(page.equals("wishlist"))wishlist();else if(page.equals("premium"))premium();else home();
+        }else if(page.equals("book"))book(selected);else if(page.equals("person"))person(selected);else if(page.equals("people"))people();else if(page.equals("history"))history();else if(page.equals("books"))books();else if(page.equals("lend"))lend(selected);else if(page.equals("wishlist"))wishlist();else if(page.equals("premium"))premium();else if(page.equals("privacy"))privacy();else home();
     }
     @Override protected void onSaveInstanceState(Bundle s){super.onSaveInstanceState(s);s.putString("page",page);s.putLong("selected",selected);s.putLong("editing",editing);if(page.equals("edit")){try{JSONObject d=draft();d.put("_initial",initial);try(FileOutputStream out=openFileOutput("editor-draft.json",MODE_PRIVATE)){out.write(d.toString().getBytes("UTF-8"));}s.putBoolean("hasDraft",true);}catch(Exception ignored){}}}
     @Override protected void onResume(){super.onResume();if(premiumBilling!=null)premiumBilling.refresh();}
@@ -76,6 +76,75 @@ public class MainActivity extends Activity {
             safe(()->startActivity(i));
         });
     }
+    private void privacy(){
+        layout("Política de Privacidade","privacy");
+        TextView content=text(body,PRIVACY_TEXT,15);
+        content.setTextIsSelectable(true);
+    }
+    private static final String PRIVACY_TEXT =
+            "\n"+
+            "Última atualização: 1º de novembro de 2026\n"+
+            "\n"+
+            "O Literariamente é um aplicativo Android para organização de bibliotecas pessoais. Esta política explica como os dados são tratados no aplicativo.\n"+
+            "\n"+
+            "\n"+
+            "1. Dados armazenados no dispositivo\n"+
+            "\n"+
+            "O aplicativo armazena localmente os dados que você cadastra, como livros, autores, capas, avaliações, lista de desejos, nomes de pessoas, empréstimos, devoluções e histórico. Esses dados ficam no armazenamento privado do aplicativo e não são enviados a servidores próprios do Literariamente. Não há cadastro de conta do Literariamente nem sincronização própria entre dispositivos.\n"+
+            "\n"+
+            "\n"+
+            "2. Consulta opcional à Open Library\n"+
+            "\n"+
+            "Quando você solicita uma busca de livros ou capas pela internet, o aplicativo envia os termos da consulta, como título, autor ou ISBN, à Open Library, por conexão HTTPS. Ao carregar capas, também são feitas solicitações ao serviço de capas da Open Library. O provedor externo pode receber informações técnicas da conexão, como endereço IP, de acordo com suas próprias práticas. O Literariamente não envia nomes de pessoas cadastradas nem o histórico de empréstimos nessas consultas.\n"+
+            "\n"+
+            "Serviço externo: https://openlibrary.org/\n"+
+            "\n"+
+            "\n"+
+            "3. Compras e acesso Premium\n"+
+            "\n"+
+            "O Literariamente oferece uma compra única Premium por meio do Google Play Billing. O Google Play processa os pagamentos e fornece ao aplicativo o estado da compra para liberar ou restaurar o acesso. O Literariamente não recebe nem armazena dados completos de cartão bancário. O aplicativo guarda localmente um indicador de acesso Premium para permitir uso offline após uma verificação bem-sucedida. O processamento de pagamentos e os dados associados à conta Google seguem as políticas do Google Play.\n"+
+            "\n"+
+            "Política de privacidade do Google: https://policies.google.com/privacy\n"+
+            "\n"+
+            "\n"+
+            "4. Imagens, câmera e arquivos\n"+
+            "\n"+
+            "Você pode selecionar imagens do aparelho ou capturar uma foto para utilizar como capa de livro. Essas imagens são usadas para a função solicitada e armazenadas na biblioteca local. O aplicativo também permite exportar e importar arquivos de backup JSON por meio do seletor de documentos do Android. Os backups podem conter nomes de pessoas, livros, capas e histórico de empréstimos, e não são criptografados pelo Literariamente.\n"+
+            "\n"+
+            "Ao escolher salvar um backup em serviços de terceiros, como armazenamento em nuvem disponível no seletor de documentos, o tratamento desse arquivo passa a depender também das políticas do serviço escolhido.\n"+
+            "\n"+
+            "\n"+
+            "5. Compartilhamento e finalidade\n"+
+            "\n"+
+            "Os dados da biblioteca são usados para as funcionalidades de organização, empréstimos e restauração. O aplicativo não opera um servidor próprio para receber sua biblioteca, não comercializa seus dados e não utiliza os registros da biblioteca para publicidade. A comunicação com terceiros ocorre nas funções opcionais de busca de livros e no processamento/validação de compras pelo Google Play.\n"+
+            "\n"+
+            "\n"+
+            "6. Retenção e exclusão\n"+
+            "\n"+
+            "Os registros da biblioteca permanecem no dispositivo até que você os altere, exclua ou remova os dados do aplicativo. A desinstalação normalmente remove os dados locais do aplicativo. Backups exportados permanecem onde você os salvou e devem ser apagados separadamente. Informações de transações mantidas pelo Google são administradas conforme as políticas e obrigações daquele serviço.\n"+
+            "\n"+
+            "\n"+
+            "7. Segurança\n"+
+            "\n"+
+            "As conexões de consulta de livros utilizam HTTPS, e os registros ficam no armazenamento privado do aplicativo Android. Nenhum sistema é totalmente isento de riscos. Proteja seu dispositivo e seus arquivos de backup, especialmente porque os arquivos JSON exportados não são criptografados.\n"+
+            "\n"+
+            "\n"+
+            "8. Crianças\n"+
+            "\n"+
+            "O aplicativo é destinado à organização pessoal de livros e não foi projetado especificamente para crianças. Não solicita data de nascimento nem mantém perfis de crianças.\n"+
+            "\n"+
+            "\n"+
+            "9. Alterações nesta política\n"+
+            "\n"+
+            "Esta política poderá ser atualizada para refletir mudanças no aplicativo ou em seus serviços externos. A versão vigente será publicada neste endereço.\n"+
+            "\n"+
+            "\n"+
+            "10. Contato\n"+
+            "\n"+
+            "Para questões relacionadas à privacidade, abra uma solicitação no repositório oficial: https://github.com/gabrielogaier/literariamentebiblioapp/issues\n"+
+            "\n"+
+            "Antes da publicação no Google Play, o desenvolvedor deve informar também um endereço de e-mail de contato válido na ficha do aplicativo.\n"+
+            "\n";
     private int dp(int n){return Math.round(n*getResources().getDisplayMetrics().density);}
     private void layout(String title,String current){
         generation++;page=current;fields.clear();ratingBar=null;
@@ -130,6 +199,7 @@ public class MainActivity extends Activity {
             for(JSONObject p:people){LinearLayout c=card(body);TextView n=text(c,p.optString("name"),19);n.setTypeface(Typeface.SERIF,Typeface.BOLD);text(c,p.optInt("total")+" livro(s)",15);button(c,"Ver livros",()->person(p.optLong("id")));}
         }
         LinearLayout backup=card(body);text(backup,"Proteja sua biblioteca",18).setTypeface(Typeface.SERIF,Typeface.BOLD);text(backup,"Salve uma cópia antes de trocar ou formatar o celular.",14);button(backup,"Exportar backup",this::exportBackup);button(backup,"Restaurar backup",this::importBackup);
+        button(body,"Política de Privacidade",this::privacy);
     }
     private void stat(LinearLayout parent,String icon,String value,String label){
         LinearLayout c=new LinearLayout(this);c.setOrientation(1);c.setGravity(Gravity.CENTER);c.setPadding(dp(6),dp(10),dp(6),dp(10));GradientDrawable bg=rounded(cardPaper,15);bg.setStroke(dp(1),line);c.setBackground(bg);
