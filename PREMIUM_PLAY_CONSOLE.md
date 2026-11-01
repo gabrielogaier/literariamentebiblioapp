@@ -17,12 +17,12 @@ Um único aplicativo Android, biblioteca offline e compra única não consumíve
 2. Criar e ativar o produto de compra única com ID **exatamente** `literariamente_premium`. Configurar o preço no Console; não o gravar no código.
 3. Para testar, em **GitHub Actions > Build Android (APK e AAB) > Run workflow**, marcar `premium_teste=true` e **não** marcar `publicar_release`. Baixar o AAB assinado do artefato dessa execução e enviar à faixa de testes internos na Play Console. Configurar compradores de licença (license testers). Comprar com pagamento de teste, verificar estados PENDING/PURCHASED e restauração em outro aparelho.
 4. Criar códigos promocionais individuais para os dois usuários antigos, ativar promoção e validar resgate em suas contas Google. Para campanha de dez primeiros, gerar dez códigos individuais, não um código genérico de dez usos.
-5. Depois dos testes e das cortesias, preparar a ativação definitiva: alterar o padrão da propriedade Gradle `premiumEnforcement` de `false` para `true` em um PR específico, validar as migrações e lançar novo AAB. Não ativar antes de assegurar cortesias e compatibilidade de assinatura.
+5. A versão de distribuição agora utiliza `premiumEnforcement=true` por padrão. Confirmar produto ativo, testes, migrações, códigos de cortesia e compatibilidade de assinatura antes de enviar o AAB à revisão.
 6. Antes da atualização com cobranças, recomendar exportar backup. Garantir que os usuários antigos resgatem os códigos antes de ativar bloqueios.
 
 ## Estado atual
 
-A integração e a tela Premium estão preparadas. **A aplicação das restrições está desativada por padrão** nas builds de debug e release. Para gerar um AAB de teste com acesso controlado, usar somente o parâmetro `-PpremiumEnforcement=true` ou a opção `premium_teste` no workflow manual. Este modo de teste não publica GitHub Release. Enquanto estiver desativada, o usuário não pode realizar compras pela interface e os recursos existentes seguem disponíveis.
+A integração e a tela Premium estão preparadas. **A aplicação das restrições Premium está ativada por padrão** nas builds de debug e release. O workflow gera AAB assinado com `-PpremiumEnforcement=true`; `premium_teste` apenas impede a publicação de GitHub Release e identifica a execução como teste interno. Desativação explícita via `-PpremiumEnforcement=false` fica reservada a desenvolvimento local. A disponibilidade de compra depende do produto configurado na Play Console.
 
 A licença é recuperada consultando o Google Play quando há conexão. Após confirmação, um registro local permite continuar usando o Premium offline. Sem backend próprio, uma compra reembolsada/revogada não pode ser detectada enquanto o dispositivo estiver offline e a validação no cliente é menos resistente a adulteração do que a verificação em servidor. Não inventar licença por data de instalação nem por presença de dados antigos.
 
@@ -40,6 +40,10 @@ A compra é reconhecida somente após status `PURCHASED`; compras pendentes não
 - Confirmar que restaurar backup de formato legado preserva atomicidade e que a exportação gratuita continua acessível.
 - Testar reembolso e revogação com rede e observar remoção do direito; testar que dados antigos nunca sejam apagados.
 - Confirmar assinatura de atualização do APK distribuído anteriormente e Play App Signing antes de migrar instalações.
+
+## Política de privacidade
+
+Política pública: https://github.com/gabrielogaier/literariamentebiblioapp/blob/main/PRIVACIDADE.md . Antes da revisão, confirmar informações de contato e alinhar o formulário Segurança dos dados da Play Console à política.
 
 ## Segurança e privacidade
 
