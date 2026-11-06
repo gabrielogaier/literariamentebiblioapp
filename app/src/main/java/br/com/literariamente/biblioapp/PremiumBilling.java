@@ -20,6 +20,7 @@ final class PremiumBilling implements PurchasesUpdatedListener {
     private final Runnable changed;
     interface MessageListener { void show(String message); }
     interface ProductCallback { void accept(ProductDetails product); }
+    interface AccessCallback { void accept(Boolean hasAccess); } // null: falha na consulta
     private final MessageListener notify;
     private boolean owned;
     private boolean connected;
@@ -57,11 +58,19 @@ final class PremiumBilling implements PurchasesUpdatedListener {
             @Override public void onBillingServiceDisconnected(){connected=false;connecting=false;}
         });
     }
-    void refresh(){
-        if(!connected){connect();return;} // Não revogar compra por falta de conexão.
+    void refresh(){checkAccess(null);}
+    void checkAccess(AccessCallback done){
+        if(!connected){
+            connect();
+            if(done!=null)activity.runOnUiThread(()->done.accept(null));
+            return; // Não revogar compra por falta de conexão.
+        }
         QueryPurchasesParams params=QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP).build();
         client.queryPurchasesAsync(params,(result,purchases)->{
-            if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK)return;
+            if(result.getResponseCode()!=BillingClient.BillingResponseCode.OK){
+                if(done!=null)activity.runOnUiThread(()->done.accept(null));
+                return;
+            }
             boolean found=false;
             for(Purchase p:purchases){
                 if(p.getProducts().contains(PRODUCT_ID)){
@@ -74,6 +83,10 @@ final class PremiumBilling implements PurchasesUpdatedListener {
                 }
             }
             setOwned(found); // Apenas resposta válida do Google Play altera a licença.
+            if(done!=null){
+                final boolean active=found;
+                activity.runOnUiThread(()->done.accept(active));
+            }
         });
     }
     private void acknowledge(Purchase purchase){
@@ -116,7 +129,12 @@ final class PremiumBilling implements PurchasesUpdatedListener {
     }
     void buy(){
         if(owned){notify.show("O Premium já está ativo nesta conta.");return;}
-        loadPrice(product->{
+        checkAccess(active->{
+            if(active==null){notify.show("Não foi possível verificar suas compras na Google Play. Tente novamente.");return;}
+            if(active){notify.show("O Premium já está ativo nesta conta.");return;}
+            loadPrice(product->{
+            // Revalidar também o estado local caso uma consulta paralela tenha liberado o acesso.
+            if(owned){notify.show("O Premium já está ativo nesta conta.");return;}
             List<ProductDetails.OneTimePurchaseOfferDetails> offers=product.getOneTimePurchaseOfferDetailsList();
             if(offers==null||offers.isEmpty())return;
             BillingFlowParams.ProductDetailsParams item=BillingFlowParams.ProductDetailsParams.newBuilder()
@@ -127,6 +145,7 @@ final class PremiumBilling implements PurchasesUpdatedListener {
                 .setProductDetailsParamsList(Collections.singletonList(item)).build());
             if(launched.getResponseCode()!=BillingClient.BillingResponseCode.OK)
                 notify.show("Não foi possível iniciar a compra na Google Play.");
+            });
         });
     }
     @Override public void onPurchasesUpdated(BillingResult result,List<Purchase> purchases){
