@@ -52,6 +52,21 @@ public class MainActivity extends Activity {
             .setPositiveButton("Conhecer Premium",(d,w)->premium()).show();
         return false;
     }
+    private void restorePremium(){
+        if(premiumBilling==null)return;
+        toast("Verificando sua compra na Google Play...");
+        premiumBilling.checkAccess(active->{
+            if(isFinishing()||isDestroyed())return;
+            if(active==null){
+                toast("Não foi possível consultar a Google Play. Confira a conexão e a conta utilizada.");
+            }else if(active){
+                toast("Premium restaurado com sucesso!");
+                if(page.equals("premium"))premium();
+            }else{
+                toast("Nenhuma compra Premium foi encontrada na conta Google da Play Store.");
+            }
+        });
+    }
     private void premium(){
         layout("Premium","premium");
         text(body,"Biblioteca gratuita para sempre. Premium é uma compra única, sem assinatura.",17);
@@ -69,7 +84,7 @@ public class MainActivity extends Activity {
         }else{
             text(body,"Valor atual na Google Play: "+(premiumBilling==null?"indisponível":premiumBilling.price()),17);
             primaryButton(body,"Comprar Premium",()->{if(premiumBilling!=null)premiumBilling.buy();});
-            button(body,"Já comprei / restaurar compra",()->{if(premiumBilling!=null)premiumBilling.refresh();});
+            button(body,"Já comprei / restaurar compra",this::restorePremium);
         }
         button(body,"Resgatar código da Google Play",()->{
             Intent i=new Intent(Intent.ACTION_VIEW,android.net.Uri.parse("https://play.google.com/redeem"));
